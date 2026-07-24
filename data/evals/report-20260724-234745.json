@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-07-24T18:17:45.370621+00:00",
+  "model": "claude-sonnet-5",
+  "pricing_usd_per_mtok": {
+    "input": 3.0,
+    "output": 15.0
+  },
+  "results": [
+    {
+      "ticker": "AAPL",
+      "numeric_accuracy": 0.958,
+      "ungrounded_numbers": [
+        "$797B"
+      ],
+      "verifier_catch_rate": 1.0,
+      "critic_catch_rate": 1.0,
+      "critic_approves_clean": false,
+      "revisions_in_run": 1,
+      "latency_s": 54.5,
+      "llm_calls": 6,
+      "input_tokens": 6639,
+      "output_tokens": 4649,
+      "cost_usd": 0.0897,
+      "memo": "\"# AAPL Investment Memo\\n\\n## Thesis\\nApple is a highly profitable, growing mega-cap technology company (27.15% profit margin, 16.6% revenue growth) currently priced at a premium multiple (40.20x trailing, 34.48x forward P/E). The market is pricing in continued double-digit earnings growth. Near-term price action ($332.48, +3.54%) appears driven by broad tech-sector dynamics rather than Apple-specific fundamentals, warranting caution about chasing the move.\\n\\n## Fundamentals\\n- **Market cap:** ~$4.88 trillion\\n- **Profitability:** 27.15% profit margin \u2014 strong\\n- **Growth:** 16.6% revenue growth \u2014 healthy\\n- **Valuation:** 40.20x trailing P/E, 34.48x forward P/E \u2014 rich, implies sustained growth expectations\\n- **Price action:** Up 3.54% from prior close of $321.10, a move the provided fundamentals don't fully explain\\n\\n## News & Sentiment\\n- **Overall tone:** Negative/risk-off, but broad-market driven, not AAPL-specific\\n- Largest catalyst: a \\\"Magnificent 7\\\" selloff (-$797B in a single session, worst since April 2025), with AAPL swept up as a mega-cap component\\n- Peripheral items (dividend ETF commentary, JEPI tax structure, Google EU AI compliance) are tangential\\n- The FDVV/dividend-ETF piece flags AAPL's mega-cap concentration as an emerging portfolio-risk theme\\n- **No Apple-specific negative news identified** \u2014 the selloff reflects sector-wide de-risking; watch for a bounce or continued follow-through in mega-cap tech\\n\\n## Key Risks\\n1. **Valuation risk:** 40x trailing / 34x forward P/E prices in sustained double-digit growth; any deceleration from the current 16.6% pace could trigger sharp multiple compression, especially given the ~$4.9T cap leaves little margin for error\\n2. **Growth quality unknown:** Revenue growth may be partly driven by China/iPhone cycle dynamics \u2014 durability is unconfirmed in the data provided\\n3. **Unexplained volatility:** The 3.54% single-day jump isn't explained by the fundamentals shown, suggesting an event-driven (earnings/guidance/macro) move that needs further scrutiny\\n4. **Limited visibility:** No 10-K-level detail on balance-sheet leverage, buyback pace, segment mix (China exposure, services vs. hardware), or margin durability \u2014 makes it hard to stress-test the headline profitability and growth figures\\n5. **Concentration risk:** AAPL's mega-cap weighting makes it a proxy for broad tech risk-off sentiment, as evidenced by the \\\"Magnificent 7\\\" selloff dragging it down alongside peers\\n\\n## Bull vs Bear\\n\\n**Bull case:**\\n- Strong, proven profitability (27.15% margin) and healthy double-digit revenue growth (16.6%)\\n- Market recognizes quality/growth with a premium multiple, reflecting confidence in continued execution\\n- Current selloff is macro/sector-driven, not company-specific \u2014 no fundamental deterioration reported\\n\\n**Bear case:**\\n- Valuation leaves no room for error; a growth slowdown could trigger disproportionate multiple compression given the massive $4.9T cap\\n- Mega-cap concentration risk is now being explicitly flagged in market commentary (FDVV/dividend ETF discussion)\\n- Lack of visibility into segment/margin drivers makes it difficult to confirm growth quality or durability\\n- Broad tech de-risking (Mag 7 selloff) signals potential further downside if risk-off sentiment persists\\n\\n## Rating: **Hold**\\n\\nApple's fundamentals remain strong, but the stock's rich valuation (40x trailing P/E) combined with unexplained price volatility and broader sector risk-off sentiment argues against initiating or adding to positions at current levels. Absent Apple-specific negative news, this is not a fundamentals-driven sell signal, but the premium multiple and macro overhang (Mag 7 selloff, concentration risk commentary) warrant a wait-and-see stance rather than a Buy. Investors should monitor for clarity on the recent price move and confirmation that the 16.6% growth rate is durable before adding exposure.\\n\\n---\\n\\n*This is not investment advice.*\""
+    }
+  ]
+}

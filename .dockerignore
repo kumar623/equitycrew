@@ -1,0 +1,19 @@
+# Never ship secrets or local junk into the image.
+.env
+.env.*
+!.env.example
+
+.venv/
+__pycache__/
+*.py[cod]
+.git/
+.gitignore
+.DS_Store
+.claude/
+
+# Eval reports are local artifacts; the 10-K FAISS indexes ARE shipped
+# (data/indexes) so the deployed demo has RAG grounding out of the box.
+data/evals/
+docs/
+*.md
+!README.md

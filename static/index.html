@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EquityCrew — Multi-Agent Equity Research</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c2129; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --accent2: #a78bfa;
+    --ok: #3fb950; --warn: #d29922; --err: #f85149;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text);
+         font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+         min-height: 100vh; padding: 30px 16px 60px; }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  h1 { font-size: 27px; letter-spacing: -.5px; }
+  h1 span { background: linear-gradient(90deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { color: var(--muted); font-size: 13.5px; }
+  .bar { display: flex; gap: 10px; margin: 20px 0 6px; }
+  input { width: 150px; padding: 11px 14px; font-size: 16px; font-weight: 600;
+          background: var(--panel); color: var(--text); letter-spacing: 1px;
+          border: 1px solid var(--border); border-radius: 10px; text-transform: uppercase; }
+  input:focus { outline: none; border-color: var(--accent); }
+  button#go { padding: 11px 26px; font-size: 15px; font-weight: 700; color: #0d1117;
+          background: linear-gradient(90deg, var(--accent), var(--accent2));
+          border: none; border-radius: 10px; cursor: pointer; transition: filter .15s, transform .15s; }
+  button#go:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-1px); }
+  button#go:disabled { opacity: .45; cursor: default; }
+
+  .stage { position: relative; }
+  .stage::before { content: ""; position: absolute; inset: 8% 18%;
+    background: radial-gradient(ellipse at center, rgba(88,166,255,.07), transparent 65%);
+    pointer-events: none; }
+  svg#viz { width: 100%; height: auto; display: block; }
+
+  /* --- circle nodes --- */
+  .node .body { fill: var(--panel); stroke: var(--border); stroke-width: 2; transition: stroke .3s, fill .3s; }
+  .node .icon { font-size: 26px; opacity: .38; transition: opacity .3s; }
+  .node .name { font-size: 13px; fill: var(--muted); font-weight: 600; transition: fill .3s; }
+  .node .tag  { font-size: 11px; fill: var(--warn); font-weight: 600; }
+  .node .halo { fill: none; stroke: var(--accent); stroke-width: 2; opacity: 0;
+                transform-box: fill-box; transform-origin: center; }
+  .node.active .body { stroke: var(--accent); }
+  .node.active .icon, .node.done .icon { opacity: 1; }
+  .node.active .name { fill: var(--text); }
+  .node.active .halo { animation: ping 1.6s ease-out infinite; }
+  .node.done .body { stroke: var(--ok); }
+  .node.done .name { fill: var(--text); }
+  .node.error .body { stroke: var(--err); }
+  .badge { opacity: 0; transition: opacity .3s; }
+  .node.done .badge { opacity: 1; }
+  @keyframes ping { 0% { transform: scale(1); opacity: .8; }
+                    80%, 100% { transform: scale(1.45); opacity: 0; } }
+
+  /* --- arrows --- */
+  .arrow { fill: none; stroke: var(--border); stroke-width: 2.5; transition: stroke .3s; }
+  .arrow.flow { stroke: var(--accent); stroke-dasharray: 7 7; animation: dash 1s linear infinite; }
+  .arrow.done { stroke: var(--ok); opacity: .75; }
+  #revArrow { fill: none; stroke: var(--warn); stroke-width: 2.5; stroke-dasharray: 7 7;
+              opacity: 0; transition: opacity .3s; }
+  #revArrow.flow { opacity: 1; animation: dash 1s linear infinite; }
+  #revArrow.was { opacity: .35; animation: none; }
+  #revLabel { font-size: 11.5px; fill: var(--warn); font-weight: 700; opacity: 0; transition: opacity .3s; }
+  #revLabel.show { opacity: 1; }
+  @keyframes dash { to { stroke-dashoffset: -28; } }
+
+  /* --- center gauge --- */
+  #ringTrack { fill: none; stroke: var(--panel2); stroke-width: 13; }
+  #ringFill  { fill: none; stroke: url(#ringGrad); stroke-width: 13; stroke-linecap: round;
+               transition: stroke-dashoffset .7s cubic-bezier(.4,0,.2,1); }
+  #pct { font-size: 47px; font-weight: 800; fill: var(--text); letter-spacing: -1px; }
+  #pctSign { font-size: 20px; font-weight: 700; fill: var(--muted); }
+  #centerTicker { font-size: 14px; font-weight: 700; fill: var(--accent); letter-spacing: 2px; }
+  #centerStatus { font-size: 13px; fill: var(--muted); }
+
+  .legend { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap;
+            color: var(--muted); font-size: 12px; margin: 2px 0 22px; }
+  .legend b { font-weight: 600; color: var(--muted); }
+  .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+            margin-right: 5px; vertical-align: 1px; }
+
+  #error { display: none; background: rgba(248,81,73,.1); color: var(--err);
+           border: 1px solid var(--err); border-radius: 10px;
+           padding: 14px 16px; font-size: 14px; margin: 14px 0; }
+  .verify { display: none; font-size: 13.5px; color: var(--text);
+            background: var(--panel); border: 1px solid var(--border);
+            border-left: 3px solid var(--ok); border-radius: 8px;
+            padding: 12px 16px; margin-bottom: 14px; }
+  #memo { background: var(--panel); border: 1px solid var(--border);
+          border-radius: 12px; padding: 30px 34px; line-height: 1.68;
+          display: none; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+  #memo h1, #memo h2, #memo h3 { margin: 20px 0 8px; }
+  #memo h1:first-child, #memo h2:first-child { margin-top: 0; }
+  #memo p, #memo ul { margin-bottom: 10px; }
+  #memo li { margin-left: 20px; }
+  #memo strong { color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Equity<span>Crew</span></h1>
+    <div class="sub">Multi-agent equity research — LangGraph · Claude · live data · self-verifying</div>
+  </header>
+
+  <div class="bar">
+    <input id="ticker" placeholder="NVDA" value="NVDA" maxlength="6">
+    <button id="go" onclick="run()">Research</button>
+  </div>
+
+  <div id="error"></div>
+  <div class="stage"><svg id="viz" viewBox="0 0 800 620"></svg></div>
+
+  <div class="legend">
+    <span><b><span class="swatch" style="background:var(--border)"></span>waiting</b></span>
+    <span><b><span class="swatch" style="background:var(--accent)"></span>running</b></span>
+    <span><b><span class="swatch" style="background:var(--ok)"></span>done</b></span>
+    <span><b><span class="swatch" style="background:var(--warn)"></span>revision loop</b></span>
+  </div>
+
+  <div class="verify" id="verify"></div>
+  <div id="memo"></div>
+</div>
+
+<script>
+const NODES = [
+  { id: "financials", icon: "📊", name: "Financials", run: "Fetching live financials…" },
+  { id: "news",       icon: "📰", name: "News",       run: "Reading headlines…" },
+  { id: "risk",       icon: "⚠️", name: "Risk",       run: "Analyzing 10-K risks…" },
+  { id: "writer",     icon: "✍️", name: "Writer",     run: "Drafting the memo…" },
+  { id: "critic",     icon: "🧐", name: "Critic",     run: "Critic reviewing draft…" },
+  { id: "verifier",   icon: "🔍", name: "Verifier",   run: "Fact-checking every number…" },
+  { id: "finalize",   icon: "📄", name: "Memo",       run: "Assembling final memo…" },
+];
+const CX = 400, CY = 310, R = 208, NODE_R = 37, RING_R = 118;
+const svg = document.getElementById("viz");
+const NS = "http://www.w3.org/2000/svg";
+let es = null, completed = new Set(), revised = false;
+
+const pos = i => {
+  const a = (i * 360 / NODES.length - 90) * Math.PI / 180;
+  return [CX + R * Math.cos(a), CY + R * Math.sin(a), a];
+};
+const onCircle = (deg, r) => {
+  const a = deg * Math.PI / 180;
+  return [CX + r * Math.cos(a), CY + r * Math.sin(a)];
+};
+const el = (tag, attrs, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  (parent || svg).appendChild(e);
+  return e;
+};
+
+function buildScene() {
+  svg.innerHTML = "";
+  // defs: ring gradient + arrowheads
+  const defs = el("defs", {});
+  const grad = el("linearGradient", { id: "ringGrad", x1: 0, y1: 0, x2: 1, y2: 1 }, defs);
+  el("stop", { offset: "0%", "stop-color": "#58a6ff" }, grad);
+  el("stop", { offset: "100%", "stop-color": "#a78bfa" }, grad);
+  for (const [id, color] of [["ahIdle", "#30363d"], ["ahFlow", "#58a6ff"], ["ahDone", "#3fb950"], ["ahWarn", "#d29922"]]) {
+    const m = el("marker", { id, viewBox: "0 0 10 10", refX: 8, refY: 5,
+                             markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M0,0 L10,5 L0,10 z", fill: color }, m);
+  }
+
+  // arrows between consecutive nodes (along the circle)
+  const step = 360 / NODES.length, gap = 15;
+  for (let i = 0; i < NODES.length - 1; i++) {
+    const a1 = i * step - 90 + gap, a2 = (i + 1) * step - 90 - gap;
+    const [x1, y1] = onCircle(a1, R), [x2, y2] = onCircle(a2, R);
+    el("path", { id: `arrow-${NODES[i + 1].id}`, class: "arrow", "marker-end": "url(#ahIdle)",
+                 d: `M ${x1} ${y1} A ${R} ${R} 0 0 1 ${x2} ${y2}` });
+  }
+  // revision arrow: critic (4) back to writer (3), bowed toward the center
+  const [wx, wy] = pos(3), [cx2, cy2] = pos(4);
+  const mx = CX + (R - 150) * Math.cos((3.5 * step - 90) * Math.PI / 180);
+  const my = CY + (R - 150) * Math.sin((3.5 * step - 90) * Math.PI / 180);
+  el("path", { id: "revArrow", "marker-end": "url(#ahWarn)",
+               d: `M ${cx2 - 30} ${cy2 - 24} Q ${mx} ${my} ${wx + 34} ${wy - 18}` });
+  const rl = el("text", { id: "revLabel", x: mx, y: my + 16, "text-anchor": "middle" });
+  rl.textContent = "revise";
+
+  // center gauge
+  const C = 2 * Math.PI * RING_R;
+  el("circle", { id: "ringTrack", cx: CX, cy: CY, r: RING_R });
+  el("circle", { id: "ringFill", cx: CX, cy: CY, r: RING_R,
+                 "stroke-dasharray": C, "stroke-dashoffset": C,
+                 transform: `rotate(-90 ${CX} ${CY})` });
+  const t1 = el("text", { id: "centerTicker", x: CX, y: CY - 52, "text-anchor": "middle" });
+  t1.textContent = "";
+  const t2 = el("text", { x: CX, y: CY + 16, "text-anchor": "middle" });
+  const pctT = el("tspan", { id: "pct" }, t2); pctT.textContent = "0";
+  const signT = el("tspan", { id: "pctSign", dx: 2 }, t2); signT.textContent = "%";
+  const t3 = el("text", { id: "centerStatus", x: CX, y: CY + 52, "text-anchor": "middle" });
+  t3.textContent = "enter a ticker to start";
+
+  // nodes on top
+  NODES.forEach((n, i) => {
+    const [x, y, a] = pos(i);
+    const g = el("g", { id: `node-${n.id}`, class: "node" });
+    el("circle", { class: "halo", cx: x, cy: y, r: NODE_R }, g);
+    el("circle", { class: "body", cx: x, cy: y, r: NODE_R }, g);
+    const ic = el("text", { class: "icon", x, y: y + 9, "text-anchor": "middle" }, g);
+    ic.textContent = n.icon;
+    const lx = CX + (R + 64) * Math.cos(a), ly = CY + (R + 64) * Math.sin(a);
+    const nm = el("text", { class: "name", x: lx, y: ly + 4, "text-anchor": "middle" }, g);
+    nm.textContent = n.name;
+    const tg = el("text", { class: "tag", id: `tag-${n.id}`, x: lx, y: ly + 20, "text-anchor": "middle" }, g);
+    tg.textContent = "";
+    // done badge (small green check at node's top right)
+    const b = el("g", { class: "badge" }, g);
+    el("circle", { cx: x + 26, cy: y - 26, r: 10, fill: "#3fb950" }, b);
+    const ch = el("text", { x: x + 26, y: y - 22, "text-anchor": "middle",
+                            "font-size": 12, "font-weight": 700, fill: "#0d1117" }, b);
+    ch.textContent = "✓";
+  });
+}
+
+// ---------- state transitions ----------
+const nodeEl = id => document.getElementById(`node-${id}`);
+const arrowEl = id => document.getElementById(`arrow-${id}`);
+
+function setProgress(statusText) {
+  const activeBonus = document.querySelector(".node.active") ? 0.45 : 0;
+  const frac = Math.min((completed.size + activeBonus) / NODES.length, 1);
+  const C = 2 * Math.PI * RING_R;
+  document.getElementById("ringFill").setAttribute("stroke-dashoffset", C * (1 - frac));
+  animateNumber(Math.round(frac * 100));
+  if (statusText) document.getElementById("centerStatus").textContent = statusText;
+}
+let numTimer = null;
+function animateNumber(target) {
+  clearInterval(numTimer);
+  const elp = document.getElementById("pct");
+  numTimer = setInterval(() => {
+    const cur = parseInt(elp.textContent, 10);
+    if (cur === target) return clearInterval(numTimer);
+    elp.textContent = cur + Math.sign(target - cur);
+  }, 18);
+}
+function markActive(id) {
+  const n = NODES.find(n => n.id === id);
+  const g = nodeEl(id);
+  if (!g) return;
+  g.classList.remove("done"); g.classList.add("active");
+  const a = arrowEl(id);
+  if (a) { a.setAttribute("class", "arrow flow"); a.setAttribute("marker-end", "url(#ahFlow)"); }
+  setProgress(n ? n.run : "");
+}
+function markDone(id) {
+  const g = nodeEl(id);
+  if (!g) return;
+  g.classList.remove("active"); g.classList.add("done");
+  completed.add(id);
+  const a = arrowEl(id);
+  if (a) { a.setAttribute("class", "arrow done"); a.setAttribute("marker-end", "url(#ahDone)"); }
+}
+
+// ---------- run ----------
+function run() {
+  const ticker = document.getElementById("ticker").value.trim().toUpperCase() || "NVDA";
+  const btn = document.getElementById("go");
+  btn.disabled = true;
+  completed = new Set(); revised = false;
+  for (const elId of ["memo", "verify", "error"]) document.getElementById(elId).style.display = "none";
+  buildScene();
+  document.getElementById("centerTicker").textContent = ticker;
+  markActive("financials");
+
+  if (es) es.close();
+  es = new EventSource(`/research/stream?ticker=${encodeURIComponent(ticker)}`);
+  es.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    if (d.node === "error") { showError(d.message); btn.disabled = false; es.close(); return; }
+    if (d.node === "done")  { btn.disabled = false; es.close(); return; }
+
+    markDone(d.node);
+
+    if (d.node === "critic" && d.approved === false) {
+      revised = true;
+      document.getElementById("tag-critic").textContent = "revision requested";
+      document.getElementById("revArrow").setAttribute("class", "flow");
+      document.getElementById("revLabel").classList.add("show");
+      markActive("writer");
+      setProgress("Revision requested — rewriting…");
+      return;
+    }
+    if (d.node === "critic" && revised) {  // second pass done: park the rev arrow
+      document.getElementById("revArrow").setAttribute("class", "was");
+    }
+    if (d.node === "verifier" && d.verification) {
+      const v = d.verification, elv = document.getElementById("verify");
+      elv.style.display = "block";
+      elv.innerHTML = v.all_correct
+        ? "🔍 <b>Verifier:</b> all figures matched fresh data ✓"
+        : `🔍 <b>Verifier fixed ${v.mismatches.length} figure(s):</b> ${v.mismatches.join("; ")}`;
+      elv.style.borderLeftColor = v.all_correct ? "var(--ok)" : "var(--warn)";
+      document.getElementById("tag-verifier").textContent =
+        v.all_correct ? "" : `${v.mismatches.length} fixed`;
+    }
+    if (d.node === "finalize") {
+      NODES.forEach(n => markDone(n.id));
+      setProgress("Memo ready ✓");
+      if (d.memo) {
+        const m = document.getElementById("memo");
+        m.innerHTML = marked.parse(d.memo);
+        m.style.display = "block";
+        m.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      return;
+    }
+    const order = NODES.map(n => n.id);
+    const next = order[order.indexOf(d.node) + 1];
+    if (next) markActive(next);
+  };
+  es.onerror = () => { showError("Connection lost — is the server running?"); btn.disabled = false; es.close(); };
+}
+function showError(msg) {
+  const e = document.getElementById("error");
+  e.textContent = msg; e.style.display = "block";
+  const act = document.querySelector(".node.active");
+  if (act) { act.classList.remove("active"); act.classList.add("error"); }
+  document.getElementById("centerStatus").textContent = "error — see above";
+}
+document.getElementById("ticker").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !document.getElementById("go").disabled) run();
+});
+buildScene();
+</script>
+</body>
+</html>

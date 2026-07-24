@@ -1,0 +1,25 @@
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-anthropic>=0.2.0
+langchain-core>=0.3.0
+pydantic>=2.0
+yfinance>=0.2.40
+python-dotenv>=1.0
+rich>=13.0
+
+# RAG (10-K ingestion + retrieval) — local embeddings, no API key
+langchain-community>=0.3.0
+langchain-huggingface>=0.1.0
+langchain-text-splitters>=0.3.0
+sentence-transformers>=3.0
+faiss-cpu>=1.8
+requests>=2.31
+beautifulsoup4>=4.12
+
+# API + frontend
+fastapi>=0.110
+uvicorn>=0.29
+
+# Optional / later phases:
+# mcp[cli]>=1.0        # MCP server
+# langsmith>=0.1       # tracing
