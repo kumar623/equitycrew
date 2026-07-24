@@ -140,7 +140,12 @@ docker build -t equitycrew .
 docker run -p 8000:8000 -e ANTHROPIC_API_KEY=sk-ant-... equitycrew
 ```
 
-**Fly.io** (recommended — deploys straight from this folder, no GitHub needed):
+**Hugging Face Spaces** (what the live demo runs on — free, 16GB RAM, no card).
+The Space config lives in this README's frontmatter (`sdk: docker`,
+`app_port: 8000`); set `ANTHROPIC_API_KEY` under the Space's *Settings →
+Variables and secrets*, then push this repo to the Space remote.
+
+**Fly.io** (deploys straight from this folder, no GitHub needed — needs a card):
 
 ```bash
 fly launch --no-deploy --copy-config
@@ -151,8 +156,8 @@ fly deploy
 **Render** — push to GitHub, then New → Blueprint (`render.yaml`), and set
 `ANTHROPIC_API_KEY` in the dashboard.
 
-Measured on a full run inside the container: **479MB image** (2.1GB unpacked on
-disk), **~400MB resident**. Size the box at **1GB RAM** — a 512MB free instance
+Measured on a full run inside the container: **457MB image**, **~400MB
+resident**, running as UID 1000. Size the box at **1GB RAM** — a 512MB instance
 leaves no headroom once torch and the embedding model load. On a smaller box the
 app still runs; the Risk agent just falls back to reasoning over live
 fundamentals instead of citing the 10-K.
