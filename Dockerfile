@@ -6,7 +6,10 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    HF_HOME=/app/.cache/huggingface
+    HF_HOME=/app/.cache/huggingface \
+    # The model is baked in below; without this the loader still calls the Hub
+    # on every start and burns ~50s in retries whenever that call times out.
+    HF_HUB_OFFLINE=1
 
 WORKDIR /app
 

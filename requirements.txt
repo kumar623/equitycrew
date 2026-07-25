@@ -20,6 +20,8 @@ beautifulsoup4>=4.12
 fastapi>=0.110
 uvicorn>=0.29
 
+# MCP server (mcp_server.py) — exposes the same tools over the protocol
+mcp[cli]>=1.0
+
 # Optional / later phases:
-# mcp[cli]>=1.0        # MCP server
 # langsmith>=0.1       # tracing

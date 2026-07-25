@@ -1,0 +1,106 @@
+{
+  "generated_at": "2026-07-25T12:19:11.174048+00:00",
+  "ticker": "NVDA",
+  "runs": 10,
+  "passed": 10,
+  "success_rate": 1.0,
+  "latency_s": {
+    "min": 56.1,
+    "max": 128.5,
+    "mean": 86.1
+  },
+  "cost_usd_total": 1.0059,
+  "cost_usd_mean": 0.1006,
+  "results": [
+    {
+      "ok": true,
+      "missing_sections": [],
+      "chars": 4902,
+      "revisions": 1,
+      "latency_s": 105.4,
+      "cost_usd": 0.1093,
+      "error": null
+    },
+    {
+      "ok": true,
+      "missing_sections": [],
+      "chars": 4017,
+      "revisions": 1,
+      "latency_s": 108.2,
+      "cost_usd": 0.0989,
+      "error": null
+    },
+    {
+      "ok": true,
+      "missing_sections": [],
+      "chars": 4049,
+      "revisions": 1,
+      "latency_s": 73.1,
+      "cost_usd": 0.1009,
+      "error": null
+    },
+    {
+      "ok": true,
+      "missing_sections": [],
+      "chars": 4526,
+      "revisions": 1,
+      "latency_s": 56.1,
+      "cost_usd": 0.0783,
+      "error": null
+    },
+    {
+      "ok": true,
+      "missing_sections": [],
+      "chars": 4696,
+      "revisions": 1,
+      "latency_s": 75.3,
+      "cost_usd": 0.1107,
+      "error": null
+    },
+    {
+      "ok": true,
+      "missing_sections": [],
+      "chars": 4397,
+      "revisions": 1,
+      "latency_s": 128.5,
+      "cost_usd": 0.108,
+      "error": null
+    },
+    {
+      "ok": true,
+      "missing_sections": [],
+      "chars": 4029,
+      "revisions": 1,
+      "latency_s": 76.2,
+      "cost_usd": 0.1026,
+      "error": null
+    },
+    {
+      "ok": true,
+      "missing_sections": [],
+      "chars": 4381,
+      "revisions": 1,
+      "latency_s": 73.7,
+      "cost_usd": 0.1072,
+      "error": null
+    },
+    {
+      "ok": true,
+      "missing_sections": [],
+      "chars": 4523,
+      "revisions": 1,
+      "latency_s": 79.6,
+      "cost_usd": 0.1091,
+      "error": null
+    },
+    {
+      "ok": true,
+      "missing_sections": [],
+      "chars": 4513,
+      "revisions": 1,
+      "latency_s": 84.8,
+      "cost_usd": 0.0809,
+      "error": null
+    }
+  ]
+}

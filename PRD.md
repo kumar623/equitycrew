@@ -108,9 +108,20 @@ CLI / FastAPI / MCP client
 | M2 — MCP | MCP server exposing tools | ✅ Done |
 | M3 — RAG | 10-K ingestion (SEC EDGAR → FAISS) + Risk agent citations | ✅ Done |
 | M3.5 — Verifier | Self-correcting agent: re-checks all numbers vs fresh tool calls | ✅ Done |
-| M4 — Evals + tracing | Harness, metrics report, LangSmith | Next |
-| M5 — API + deploy | FastAPI, Docker, cloud URL, README polish, demo video | Planned |
-| M6 — Voice (optional) | Vapi layer: talk to the analyst from the laptop | Stretch |
+| M4 — Evals + tracing | Harness, metrics report, LangSmith | ⚠️ Partial — harness + reliability done; **LangSmith tracing not implemented** |
+| M5 — API + deploy | FastAPI, Docker, cloud URL, README polish, demo video | ⚠️ Partial — API, Docker, live URL and README done; **demo video outstanding** |
+| M6 — Voice (optional) | Vapi layer: talk to the analyst from the laptop | Not started (stretch) |
+
+### Measured against §8 success metrics
+
+| Metric | Target | Actual |
+|---|---|---|
+| Numeric accuracy | ≥ 95% | 94% (NVDA) / 96% (AAPL) — **borderline** |
+| Critic catch-rate | ≥ 80% | 100% |
+| Memo completeness | 100% | 100% (10/10 runs, all six sections) |
+| Latency | < 120 s | mean 86.1s; one run hit 128.5s under CPU contention |
+| Cost per memo | < $0.15 | $0.101 mean |
+| Demo reliability | 10/10 | 10/10 |
 
 ## 10. Risks & mitigations
 

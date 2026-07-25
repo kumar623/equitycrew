@@ -67,6 +67,20 @@ sometimes rejects the clean memo too. In the pipeline that is harmless — it
 triggers the capped revision loop — but it means the critic optimizes for recall
 over precision, and the harness records that rather than hiding it.
 
+### Reliability
+
+`python -m src.evals.reliability --runs 10` runs the crew end to end repeatedly
+and fails a run that raises, returns no memo, or drops any required section.
+
+**10/10 runs succeeded.** Mean latency 86.1s (min 56.1s, max 128.5s), mean cost
+$0.101, $1.01 for the batch. Every run triggered exactly one critic revision.
+
+The spread is worth noting: the slowest runs happened while a Docker build was
+competing for CPU on the same laptop, and one run lost ~50s to Hugging Face Hub
+timeouts while loading the embedding model. The container now sets
+`HF_HUB_OFFLINE=1`, since the model is baked into the image and the Hub call
+only ever cost time.
+
 ---
 
 ## Quickstart
@@ -89,13 +103,23 @@ uvicorn api:app --reload
 
 ## MCP server
 
+Exposes `price`, `fundamentals`, `news`, and `full_analysis` to any MCP client,
+so the same tools that power the graph also work over the protocol.
+
 ```bash
-pip install "mcp[cli]"
 python mcp_server.py
 ```
 
-Exposes `price`, `fundamentals`, `news`, and `full_analysis` to any MCP client
-(e.g. Claude Desktop), so the same tools that power the graph work over the protocol.
+**Requires Python 3.10+** — the MCP SDK does not publish wheels for 3.9, so on an
+older interpreter `pip install -r requirements.txt` will fail on this dependency.
+The Docker image runs 3.12, so the container is the reliable way to serve it:
+
+```bash
+docker run -i --rm --env-file .env equitycrew python mcp_server.py
+```
+
+That command is also what goes in a Claude Desktop MCP config entry (`command:
+"docker"`, with the remaining words as `args`).
 
 ---
 
