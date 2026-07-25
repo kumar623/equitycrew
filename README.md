@@ -13,6 +13,7 @@ short_description: Multi-agent equity research analyst with live data and self-v
 
 **Live demo: https://srv1855275.hstgr.cloud** — enter a ticker and watch seven
 agents research it in real time.
+**Source: https://github.com/kumar623/equitycrew**
 
 A crew of AI agents that produces an investment research memo on any public company,
 using **real-time market data** and a **LangGraph** state graph with a critic→writer
