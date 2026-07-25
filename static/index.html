@@ -14,7 +14,32 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text);
          font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-         min-height: 100vh; padding: 28px 16px 60px; }
+         min-height: 100vh; padding: 28px 16px 60px; position: relative; }
+  /* slow-drifting aurora wash behind everything */
+  body::before {
+    content: ""; position: fixed; inset: -25%; z-index: -2; pointer-events: none;
+    background:
+      radial-gradient(42% 38% at 18% 22%, rgba(88,166,255,.20), transparent 62%),
+      radial-gradient(38% 34% at 82% 16%, rgba(167,139,250,.17), transparent 62%),
+      radial-gradient(46% 40% at 62% 84%, rgba(63,185,80,.11), transparent 64%),
+      radial-gradient(30% 28% at 8% 78%, rgba(210,153,34,.09), transparent 62%);
+    filter: blur(26px);
+    animation: drift 26s ease-in-out infinite alternate;
+  }
+  /* faint grid so the dark areas aren't dead flat */
+  body::after {
+    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .45;
+    background-image: linear-gradient(rgba(48,54,61,.16) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(48,54,61,.16) 1px, transparent 1px);
+    background-size: 54px 54px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, #000 35%, transparent 78%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, #000 35%, transparent 78%);
+  }
+  @keyframes drift {
+    0%   { transform: translate3d(0,0,0) scale(1); }
+    50%  { transform: translate3d(-3%, 2%, 0) scale(1.07); }
+    100% { transform: translate3d(3%, -2%, 0) scale(1.03); }
+  }
   .wrap { max-width: 1060px; margin: 0 auto; }
   header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
   h1 { font-size: 27px; letter-spacing: -.5px; }
@@ -126,14 +151,84 @@
                       background: var(--panel); color: var(--text);
                       border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
   .memo-head button:hover { border-color: var(--accent); }
-  #memo { background: var(--panel); border: 1px solid var(--border);
-          border-radius: 12px; padding: 30px 34px; line-height: 1.68;
-          display: none; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
-  #memo h1, #memo h2, #memo h3 { margin: 20px 0 8px; }
-  #memo h1:first-child, #memo h2:first-child { margin-top: 0; }
-  #memo p, #memo ul { margin-bottom: 10px; }
-  #memo li { margin-left: 20px; }
-  #memo strong { color: #fff; }
+  #memo { display: none; }
+
+  /* ---------- designed memo ---------- */
+  @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  @keyframes sweep { 0% { background-position: -180% 0; } 60%, 100% { background-position: 180% 0; } }
+  @keyframes glowPulse { 0%,100% { box-shadow: 0 10px 34px var(--glow); }
+                         50% { box-shadow: 0 10px 52px var(--glow); } }
+  .anim { animation: rise .6s cubic-bezier(.2,.7,.3,1) both; }
+
+  .memo-hero { display: flex; justify-content: space-between; align-items: center;
+    gap: 22px; flex-wrap: wrap; padding: 26px 30px; border-radius: 18px;
+    border: 1px solid var(--border); margin-bottom: 14px; position: relative; overflow: hidden;
+    background: linear-gradient(135deg, rgba(88,166,255,.16), rgba(167,139,250,.11) 46%, rgba(22,27,34,.6)); }
+  .memo-hero::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(100deg, transparent 40%, rgba(255,255,255,.07) 50%, transparent 60%);
+    background-size: 220% 100%; animation: sweep 4.5s ease-in-out infinite; }
+  .hero-tic { font-size: 34px; font-weight: 800; letter-spacing: -1px; }
+  .hero-name { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+  .hero-price { font-size: 20px; font-weight: 700; margin-top: 8px; }
+  .hero-price small { font-size: 13px; font-weight: 600; margin-left: 6px; }
+  .up { color: var(--ok); } .down { color: var(--err); }
+  .rating-badge { font-size: 24px; font-weight: 800; letter-spacing: .5px;
+    padding: 13px 30px; border-radius: 15px; text-transform: uppercase;
+    animation: glowPulse 3.4s ease-in-out infinite; }
+  .rating-label { font-size: 10.5px; letter-spacing: 1.4px; color: var(--muted);
+    text-align: center; margin-bottom: 6px; text-transform: uppercase; }
+  .r-buy  { background: linear-gradient(135deg,#4ade80,#2ea043); color: #04180a; --glow: rgba(63,185,80,.42); }
+  .r-hold { background: linear-gradient(135deg,#f2c14e,#bb8009); color: #1a1200; --glow: rgba(210,153,34,.40); }
+  .r-sell { background: linear-gradient(135deg,#ff7b72,#da3633); color: #240404; --glow: rgba(248,81,73,.42); }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+           gap: 12px; margin-bottom: 14px; }
+  .tile { position: relative; overflow: hidden; padding: 15px 16px; border-radius: 14px;
+          background: linear-gradient(160deg, rgba(28,33,41,.92), rgba(22,27,34,.75));
+          border: 1px solid var(--border); transition: transform .18s, border-color .18s; }
+  .tile:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .tile::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+                  background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+  .tile b { display: block; font-size: 21px; font-weight: 800; letter-spacing: -.5px; }
+  .tile span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; }
+
+  .sec { background: linear-gradient(165deg, rgba(22,27,34,.94), rgba(22,27,34,.7));
+         border: 1px solid var(--border); border-radius: 16px; padding: 20px 26px;
+         margin-bottom: 13px; line-height: 1.72; }
+  .sec h3 { display: flex; align-items: center; gap: 9px; font-size: 12.5px;
+            letter-spacing: 1.1px; text-transform: uppercase; color: var(--muted);
+            font-weight: 700; margin-bottom: 12px; }
+  .sec h3::after { content: ""; flex: 1; height: 1px;
+                   background: linear-gradient(90deg, var(--border), transparent); }
+  .sec p { margin-bottom: 9px; }
+  .sec ul { margin: 0 0 8px 2px; list-style: none; }
+  .sec ul li { position: relative; padding-left: 18px; margin-bottom: 7px; }
+  /* dot only for unordered items — ordered lists keep their numerals */
+  .sec ul li::before { content: ""; position: absolute; left: 0; top: 9px; width: 6px; height: 6px;
+                    border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+  .sec ol { margin: 0 0 8px 20px; }
+  .sec ol li { margin-bottom: 7px; padding-left: 4px; }
+  .sec ol li::marker { color: var(--accent); font-weight: 700; }
+  .sec strong { color: #fff; }
+
+  .bb { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; margin-bottom: 13px; }
+  @media (max-width: 720px) { .bb { grid-template-columns: 1fr; } }
+  .bb .sec { margin-bottom: 0; }
+  .bull { background: linear-gradient(165deg, rgba(63,185,80,.14), rgba(22,27,34,.85) 68%);
+          border-color: rgba(63,185,80,.34); }
+  .bull h3 { color: var(--ok); }
+  .bull li::before { background: var(--ok); }
+  .bear { background: linear-gradient(165deg, rgba(248,81,73,.13), rgba(22,27,34,.85) 68%);
+          border-color: rgba(248,81,73,.32); }
+  .bear h3 { color: var(--err); }
+  .bear li::before { background: var(--err); }
+  .disclaimer { text-align: center; color: var(--muted); font-size: 12px;
+                padding: 14px; font-style: italic; }
+
+  @media (prefers-reduced-motion: reduce) {
+    body::before, .memo-hero::after, .rating-badge { animation: none; }
+    .anim { animation: none; opacity: 1; transform: none; }
+  }
 </style>
 </head>
 <body>
@@ -451,9 +546,7 @@ function run() {
       setProgress("Memo ready ✓");
       if (d.memo) {
         memoText = d.memo;
-        const m = document.getElementById("memo");
-        m.innerHTML = marked.parse(d.memo);
-        m.style.display = "block";
+        renderMemo(d.memo);
         document.getElementById("memoHead").style.display = "flex";
       }
       return;
@@ -472,6 +565,122 @@ function showError(msg) {
   if (act) { act.classList.remove("active"); act.classList.add("error"); }
   document.getElementById("centerStatus").textContent = "error — see above";
 }
+// ---------- designed memo rendering ----------
+const SEC_ICONS = [
+  [/thesis|summary|overview/i, "🎯"], [/fundamental|financial|valuation/i, "📊"],
+  [/news|sentiment|catalyst/i, "📰"], [/risk|concern|headwind/i, "⚠️"],
+  [/bull/i, "🐂"], [/bear/i, "🐻"], [/rating|recommend|verdict/i, "⭐"],
+];
+const iconFor = t => (SEC_ICONS.find(([re]) => re.test(t)) || [null, "▪"])[1];
+
+function splitSections(md) {
+  const out = [];
+  let cur = { title: null, body: [] };
+  for (const ln of md.split("\n")) {
+    const m = ln.match(/^\s{0,3}#{1,4}\s+(.+?)\s*#*\s*$/);
+    if (m) {
+      if (cur.title || cur.body.join("").trim()) out.push(cur);
+      cur = { title: m[1].replace(/\*\*/g, "").trim(), body: [] };
+    } else cur.body.push(ln);
+  }
+  if (cur.title || cur.body.join("").trim()) out.push(cur);
+  return out;
+}
+
+function fmtNum(n, kind) {
+  if (n == null || isNaN(n)) return "—";
+  if (kind === "money") {
+    if (n >= 1e12) return "$" + (n / 1e12).toFixed(2) + "T";
+    if (n >= 1e9) return "$" + (n / 1e9).toFixed(1) + "B";
+    return "$" + Number(n).toLocaleString();
+  }
+  if (kind === "pct") return (n * 100).toFixed(1) + "%";
+  return Number(n).toFixed(2);
+}
+
+function buildTiles() {
+  const d = details.financials;
+  if (!d || !d.data) return "";
+  const f = d.data.fundamentals || {}, p = d.data.price || {};
+  const tiles = [
+    ["Price", p.price != null ? "$" + p.price : "—"],
+    ["Market cap", fmtNum(f.market_cap, "money")],
+    ["Trailing P/E", fmtNum(f.trailing_pe)],
+    ["Forward P/E", fmtNum(f.forward_pe)],
+    ["Profit margin", fmtNum(f.profit_margin, "pct")],
+    ["Rev. growth", fmtNum(f.revenue_growth, "pct")],
+  ];
+  return `<div class="tiles">` + tiles.map(([label, val], i) =>
+    `<div class="tile anim" style="animation-delay:${60 + i * 45}ms">
+       <b>${esc(val)}</b><span>${esc(label)}</span></div>`).join("") + `</div>`;
+}
+
+// Split a "Bull vs Bear" section into its two halves when the writer used
+// "Bull case:" / "Bear case:" markers; returns null when it didn't.
+function splitBullBear(body) {
+  const text = body.join("\n");
+  const bullIdx = text.search(/^\s*\**\s*bull[^\n]*$/im);
+  const bearIdx = text.search(/^\s*\**\s*bear[^\n]*$/im);
+  if (bullIdx === -1 || bearIdx === -1 || bearIdx <= bullIdx) return null;
+  // drop the "Bull case:"/"Bear case:" marker — the card header already says it,
+  // whether it sat on its own line or inline at the start of the paragraph
+  // Remove just the marker token, never the whole line — it is often inline
+  // with the first sentence ("**Bull case:** Revenue growth ...").
+  const strip = s => s.replace(/^\s*\**\s*(bull|bear)\s*case\b\s*:?\s*\**\s*:?\s*/i, "").trim();
+  return { bull: strip(text.slice(bullIdx, bearIdx)), bear: strip(text.slice(bearIdx)) };
+}
+
+function renderMemo(md) {
+  const host = document.getElementById("memo");
+  host.style.display = "block";
+  const secs = splitSections(md);
+  if (secs.length < 3) { host.innerHTML = marked.parse(md); return; }  // fallback
+
+  const rating = (md.match(/rating[:\s*]*\**\s*(buy|hold|sell)/i) || [])[1];
+  const f = details.financials?.data?.fundamentals || {};
+  const p = details.financials?.data?.price || {};
+  const ticker = document.getElementById("ticker").value.trim().toUpperCase();
+  const chg = p.change_pct;
+
+  let html = `<div class="memo-hero anim">
+      <div>
+        <div class="hero-tic">${esc(ticker)}</div>
+        <div class="hero-name">${esc(f.name || "")}${f.sector ? " · " + esc(f.sector) : ""}</div>
+        ${p.price != null ? `<div class="hero-price">$${esc(p.price)}
+          <small class="${chg >= 0 ? "up" : "down"}">${chg >= 0 ? "▲" : "▼"} ${esc(Math.abs(chg))}%</small></div>` : ""}
+      </div>
+      ${rating ? `<div><div class="rating-label">Rating</div>
+        <div class="rating-badge r-${rating.toLowerCase()}">${esc(rating)}</div></div>` : ""}
+    </div>` + buildTiles();
+
+  let delay = 260, disclaimer = "";
+  for (const s of secs) {
+    let body = s.body.join("\n").trim();
+    if (!body && !s.title) continue;
+    // pull the standing disclaimer out into a footer line
+    body = body.replace(/^.*not investment advice.*$/gim, m => { disclaimer = m.trim(); return ""; }).trim();
+    if (!body) continue;
+    const title = s.title || "";
+    if (/^#?\s*.*\(?[A-Z]{1,6}\)?\s*[—-]?\s*investment memo/i.test(title)) continue;  // drop the doc title
+
+    const bb = /bull/i.test(title) && /bear/i.test(title) ? splitBullBear(s.body) : null;
+    if (bb) {
+      html += `<div class="bb">
+        <div class="sec bull anim" style="animation-delay:${delay}ms">
+          <h3>🐂 Bull case</h3>${marked.parse(bb.bull)}</div>
+        <div class="sec bear anim" style="animation-delay:${delay + 90}ms">
+          <h3>🐻 Bear case</h3>${marked.parse(bb.bear)}</div></div>`;
+      delay += 180;
+      continue;
+    }
+    html += `<div class="sec anim" style="animation-delay:${delay}ms">
+      ${title ? `<h3>${iconFor(title)} ${esc(title)}</h3>` : ""}${marked.parse(body)}</div>`;
+    delay += 90;
+  }
+  if (disclaimer) html += `<div class="disclaimer anim" style="animation-delay:${delay}ms">${esc(disclaimer)}</div>`;
+  host.innerHTML = html;
+}
+
 function copyMemo() {
   navigator.clipboard.writeText(memoText).then(() => {
     const b = document.getElementById("copyBtn");
