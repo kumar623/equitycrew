@@ -77,6 +77,45 @@ def get_news(ticker: str, limit: int = 5) -> dict:
         return {"ticker": ticker.upper(), "error": f"news unavailable: {e}"}
 
 
+def _quotes(ticker: str) -> bool:
+    """True when the symbol actually returns a tradable price."""
+    return get_price(ticker).get("price") is not None
+
+
+def resolve_ticker(ticker: str) -> dict:
+    """Validate a symbol before spending a full crew run on it.
+
+    Returns {"ok": True} when it quotes. Otherwise returns suggestions that
+    were themselves verified to quote — most often the exchange-suffixed form
+    Indian listings need (RELIANCE -> RELIANCE.NS), since Yahoo only serves
+    plain symbols for US listings.
+    """
+    sym = ticker.strip().upper()
+    if not sym:
+        return {"ok": False, "suggestions": [], "reason": "No ticker entered."}
+    if _quotes(sym):
+        return {"ok": True, "ticker": sym}
+
+    suggestions = []
+    candidates = []
+    if "." not in sym:
+        candidates += [f"{sym}.NS", f"{sym}.BO"]   # NSE, then BSE
+    # a few symbols people reach for that no longer trade under that name
+    candidates += {"HDFC": ["HDFCBANK.NS", "HDB"]}.get(sym, [])
+    for c in candidates:
+        if len(suggestions) >= 3:
+            break
+        if _quotes(c):
+            suggestions.append(c)
+    return {
+        "ok": False,
+        "ticker": sym,
+        "suggestions": suggestions,
+        "reason": f"“{sym}” returned no market data — it may be delisted, "
+                  f"renamed, or listed on a non-US exchange.",
+    }
+
+
 if __name__ == "__main__":
     import json, sys
     sym = sys.argv[1] if len(sys.argv) > 1 else "AAPL"

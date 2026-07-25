@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, StreamingResponse
 
 from src.graph import build_graph
+from src.tools.market_data import resolve_ticker
 from src.usage import UsageTracker
 
 app = FastAPI(title="EquityCrew", version="1.0")
@@ -72,6 +73,13 @@ def research_stream(ticker: str):
     """Server-Sent Events: one event per agent step, then the final memo."""
     def gen():
         try:
+            # Preflight: a symbol with no market data would otherwise burn a
+            # full crew run (~60s, ~$0.10) to conclude it has nothing to say.
+            check = resolve_ticker(ticker)
+            if not check["ok"]:
+                yield f"data: {json.dumps({'node': 'invalid_ticker', **check})}\n\n"
+                return
+
             graph = build_graph()
             tracker = UsageTracker()
             state: dict = {}

@@ -239,13 +239,14 @@
   </header>
 
   <div class="bar">
-    <input id="ticker" placeholder="NVDA" value="NVDA" maxlength="6">
+    <!-- maxlength fits exchange-suffixed symbols like HDFCBANK.NS -->
+    <input id="ticker" placeholder="NVDA" value="NVDA" maxlength="14">
     <button id="go" onclick="run()">Research</button>
     <div class="chips">
       <div class="chip" onclick="setTicker('NVDA')">NVDA</div>
       <div class="chip" onclick="setTicker('AAPL')">AAPL</div>
       <div class="chip" onclick="setTicker('MSFT')">MSFT</div>
-      <div class="chip" onclick="setTicker('TSLA')">TSLA</div>
+      <div class="chip" onclick="setTicker('HDFCBANK.NS')">HDFCBANK.NS</div>
     </div>
   </div>
 
@@ -511,6 +512,7 @@ function run() {
   es.onmessage = (e) => {
     const d = JSON.parse(e.data);
     if (d.node === "error") { showError(d.message); stop(btn); return; }
+    if (d.node === "invalid_ticker") { showInvalidTicker(d); stop(btn); return; }
     if (d.node === "done")  { updateMetrics(d); stop(btn); return; }
 
     if (d.detail) { details[d.node] = Object.assign({}, d.detail, { took_s: d.took_s }); }
@@ -679,6 +681,32 @@ function renderMemo(md) {
   }
   if (disclaimer) html += `<div class="disclaimer anim" style="animation-delay:${delay}ms">${esc(disclaimer)}</div>`;
   host.innerHTML = html;
+}
+
+function showInvalidTicker(d) {
+  const e = document.getElementById("error");
+  const sugg = (d.suggestions || []).length
+    ? `<div style="margin-top:10px">Try instead:
+        ${d.suggestions.map(s =>
+          `<span class="chip" style="display:inline-block;margin:4px 4px 0 0"
+                 onclick="setTicker('${esc(s)}')">${esc(s)}</span>`).join("")}</div>
+       <div style="margin-top:9px;color:var(--muted);font-size:12.5px">
+         Indian listings need an exchange suffix — <b>.NS</b> for the NSE,
+         <b>.BO</b> for the BSE.</div>`
+    : `<div style="margin-top:8px;color:var(--muted);font-size:12.5px">
+         No close match found. US symbols work as-is (NVDA); other exchanges
+         need a suffix, e.g. <b>HDFCBANK.NS</b> or <b>SAP.DE</b>.</div>`;
+  e.innerHTML = `<b>${esc(d.reason)}</b>${sugg}`;
+  e.style.display = "block";
+  document.getElementById("metrics").classList.remove("on");
+  document.getElementById("centerStatus").textContent = "ticker not recognised";
+  // SVG elements expose className as an SVGAnimatedString — assigning to it is
+  // a no-op, so the class must be set through setAttribute.
+  document.querySelectorAll(".node").forEach(n => n.setAttribute("class", "node"));
+  completed = new Set();
+  clearInterval(numTimer);
+  document.getElementById("pct").textContent = "0";
+  document.getElementById("ringFill").setAttribute("stroke-dashoffset", 2 * Math.PI * RING_R);
 }
 
 function copyMemo() {
