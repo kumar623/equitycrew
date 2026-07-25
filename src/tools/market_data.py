@@ -1,7 +1,7 @@
 """Real-time market-data tools. These are the ONLY source of numbers —
 agents must never invent figures, they call these.
 
-Uses yfinance (no API key needed). Finnhub is optional for richer news.
+Uses yfinance only — no API key needed for market data.
 """
 from __future__ import annotations
 from datetime import datetime, timezone

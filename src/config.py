@@ -6,7 +6,6 @@ from langchain_anthropic import ChatAnthropic
 load_dotenv()
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 
 # One place to pick the model + settings for every agent.
 MODEL_NAME = "claude-sonnet-5"
