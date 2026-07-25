@@ -12,6 +12,10 @@ FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 MODEL_NAME = "claude-sonnet-5"
 MAX_REVISIONS = 1  # cap the critic->writer loop so it always terminates
 
+# Escape hatch for memory-constrained hosts (e.g. a 512MB free instance):
+# skips loading the embedding model, so the Risk agent uses its fallback path.
+DISABLE_RAG = os.getenv("EQUITYCREW_DISABLE_RAG", "").lower() in ("1", "true", "yes")
+
 
 def get_llm() -> ChatAnthropic:
     if not ANTHROPIC_API_KEY:

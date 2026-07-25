@@ -1,16 +1,18 @@
-# Render blueprint — alternative to Fly. Push this repo to GitHub, then:
+# Render blueprint. Push this repo to GitHub, then:
 # Render dashboard → New → Blueprint → pick the repo → set ANTHROPIC_API_KEY.
 #
-# NOTE: the free instance type has 512MB RAM, which is not enough for the
-# RAG path (torch + embedding model). Free tier runs fine with the Risk agent
-# in fallback mode; use `standard` (2GB) if you want 10-K citations live.
+# The free instance has 512MB RAM and this app peaks near 438MB with 10-K
+# retrieval active — it fits, but barely. If the service gets OOM-killed,
+# set EQUITYCREW_DISABLE_RAG=1 in the dashboard: the Risk agent then reasons
+# over live fundamentals instead of loading the embedding model.
 services:
   - type: web
     name: equitycrew
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: standard
+    plan: free
+    region: singapore        # closest Render region to India
     healthCheckPath: /health
     envVars:
       - key: ANTHROPIC_API_KEY
-        sync: false        # set this in the dashboard; never commit it
+        sync: false          # set in the dashboard; never commit it

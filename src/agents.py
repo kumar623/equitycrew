@@ -11,7 +11,7 @@ import json
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
 
-from .config import get_llm, MAX_REVISIONS
+from .config import get_llm, DISABLE_RAG, MAX_REVISIONS
 from .state import ResearchState
 from .tools.market_data import get_price, get_fundamentals, get_news
 
@@ -82,6 +82,8 @@ def risk_agent(state: ResearchState) -> ResearchState:
 
     passages = []
     try:
+        if DISABLE_RAG:
+            raise RuntimeError("RAG disabled by EQUITYCREW_DISABLE_RAG")
         from .rag.retriever import retrieve
         passages = retrieve(
             ticker,
