@@ -513,6 +513,8 @@ function run() {
     const d = JSON.parse(e.data);
     if (d.node === "error") { showError(d.message); stop(btn); return; }
     if (d.node === "invalid_ticker") { showInvalidTicker(d); stop(btn); return; }
+    if (d.node === "rate_limited") { showNotice(d.message); return; }
+    if (d.cached) showNotice(d.cache_note || "Cached result — no API cost.");
     if (d.node === "done")  { updateMetrics(d); stop(btn); return; }
 
     if (d.detail) { details[d.node] = Object.assign({}, d.detail, { took_s: d.took_s }); }
@@ -562,6 +564,10 @@ function run() {
 function stop(btn) { btn.disabled = false; clearInterval(timer); if (es) es.close(); }
 function showError(msg) {
   const e = document.getElementById("error");
+  // reset the palette explicitly — showNotice may have left it amber
+  e.style.color = "var(--err)";
+  e.style.borderColor = "var(--err)";
+  e.style.background = "rgba(248,81,73,.1)";
   e.textContent = msg; e.style.display = "block";
   const act = document.querySelector(".node.active");
   if (act) { act.classList.remove("active"); act.classList.add("error"); }
@@ -681,6 +687,18 @@ function renderMemo(md) {
   }
   if (disclaimer) html += `<div class="disclaimer anim" style="animation-delay:${delay}ms">${esc(disclaimer)}</div>`;
   host.innerHTML = html;
+}
+
+// Neutral banner for cache hits and rate limits — not an error, so it must not
+// look like one; a red box on a cached result reads as "the demo is broken".
+function showNotice(msg) {
+  if (!msg) return;
+  const e = document.getElementById("error");
+  e.style.display = "block";
+  e.style.color = "var(--warn)";
+  e.style.borderColor = "var(--warn)";
+  e.style.background = "rgba(210,153,34,.10)";
+  e.innerHTML = esc(msg);
 }
 
 function showInvalidTicker(d) {

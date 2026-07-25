@@ -8,9 +8,10 @@ import json
 import time
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
+from src import limits
 from src.graph import build_graph
 from src.tools.market_data import resolve_ticker
 from src.usage import UsageTracker
@@ -68,9 +69,33 @@ def health():
     return {"status": "ok"}
 
 
+def _client_ip(request: Request) -> str:
+    """Caddy terminates TLS and sets X-Forwarded-For; the container listens on
+    loopback only, so nothing reaches this app without passing through it."""
+    fwd = request.headers.get("x-forwarded-for", "")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+@app.get("/limits")
+def limit_stats():
+    """Visible budget state — also lets the owner check usage at a glance."""
+    return limits.stats()
+
+
 @app.get("/research/stream")
-def research_stream(ticker: str):
+def research_stream(ticker: str, request: Request):
     """Server-Sent Events: one event per agent step, then the final memo."""
+    ip = _client_ip(request)
+
+    def replay(payloads, note):
+        """Re-emit a stored run so the UI animates normally, at no API cost."""
+        for p in payloads:
+            yield f"data: {json.dumps({**p, 'cached': True, 'cache_note': note})}\n\n"
+            time.sleep(0.18)
+        yield f"data: {json.dumps({'node': 'done', 'cached': True})}\n\n"
+
     def gen():
         try:
             # Preflight: a symbol with no market data would otherwise burn a
@@ -79,10 +104,28 @@ def research_stream(ticker: str):
             if not check["ok"]:
                 yield f"data: {json.dumps({'node': 'invalid_ticker', **check})}\n\n"
                 return
+            sym = check["ticker"]
+
+            # 1. Free path: replay a recent run of this ticker.
+            hit = limits.cached(sym)
+            if hit:
+                yield from replay(hit, f"Cached result for {sym} — no API cost.")
+                return
+
+            # 2. Billed path: only past the rate limits.
+            gate = limits.check(ip)
+            if not gate["ok"]:
+                fallback_ticker, payloads = limits.any_cached()
+                yield f"data: {json.dumps({'node': 'rate_limited', **gate, 'fallback_ticker': fallback_ticker})}\n\n"
+                if payloads:
+                    yield from replay(payloads, f"Showing a cached {fallback_ticker} run.")
+                return
+            limits.record(ip)
 
             graph = build_graph()
             tracker = UsageTracker()
             state: dict = {}
+            emitted: list = []
             t0 = time.time()
             last = t0
             for event in graph.stream(
@@ -109,7 +152,11 @@ def research_stream(ticker: str):
                         payload["verification"] = state.get("verification")
                     if node == "finalize":
                         payload["memo"] = state.get("final_memo")
+                    emitted.append(payload)
                     yield f"data: {json.dumps(payload)}\n\n"
+            # Cache only a run that actually produced a memo.
+            if any(p["node"] == "finalize" and p.get("memo") for p in emitted):
+                limits.store(sym, emitted)
             yield f"data: {json.dumps({'node': 'done', 'usage': tracker.snapshot(), 'elapsed_s': round(time.time() - t0, 1)})}\n\n"
         except Exception as e:  # surface errors to the UI instead of dying silently
             yield f"data: {json.dumps({'node': 'error', 'message': str(e)})}\n\n"
