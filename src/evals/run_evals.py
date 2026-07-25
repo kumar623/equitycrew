@@ -15,38 +15,15 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from langchain_core.callbacks import BaseCallbackHandler
 from rich.console import Console
 from rich.table import Table
 
 from ..agents import critic_agent, verifier_agent
+from ..config import PRICE_IN_PER_MTOK as PRICE_IN, PRICE_OUT_PER_MTOK as PRICE_OUT
 from ..graph import build_graph
 from ..tools.market_data import get_fundamentals, get_price
+from ..usage import UsageTracker
 from .metrics import critic_sabotage_variants, numeric_accuracy, perturb_numbers
-
-# claude-sonnet-5 list price, $/MTok (input, output)
-PRICE_IN, PRICE_OUT = 3.00, 15.00
-
-
-class UsageTracker(BaseCallbackHandler):
-    """Sums token usage across every LLM call in a graph run."""
-
-    def __init__(self):
-        self.input_tokens = 0
-        self.output_tokens = 0
-        self.calls = 0
-
-    def on_llm_end(self, response, **kwargs):
-        for gens in response.generations:
-            for g in gens:
-                usage = getattr(getattr(g, "message", None), "usage_metadata", None) or {}
-                self.input_tokens += usage.get("input_tokens", 0)
-                self.output_tokens += usage.get("output_tokens", 0)
-                self.calls += 1
-
-    @property
-    def cost_usd(self) -> float:
-        return self.input_tokens / 1e6 * PRICE_IN + self.output_tokens / 1e6 * PRICE_OUT
 
 
 def eval_ticker(ticker: str) -> dict:

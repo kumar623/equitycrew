@@ -14,15 +14,16 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text);
          font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-         min-height: 100vh; padding: 30px 16px 60px; }
-  .wrap { max-width: 960px; margin: 0 auto; }
+         min-height: 100vh; padding: 28px 16px 60px; }
+  .wrap { max-width: 1060px; margin: 0 auto; }
   header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
   h1 { font-size: 27px; letter-spacing: -.5px; }
   h1 span { background: linear-gradient(90deg, var(--accent), var(--accent2));
             -webkit-background-clip: text; background-clip: text; color: transparent; }
   .sub { color: var(--muted); font-size: 13.5px; }
-  .bar { display: flex; gap: 10px; margin: 20px 0 6px; }
-  input { width: 150px; padding: 11px 14px; font-size: 16px; font-weight: 600;
+
+  .bar { display: flex; gap: 10px; margin: 18px 0 8px; flex-wrap: wrap; align-items: center; }
+  input { width: 148px; padding: 11px 14px; font-size: 16px; font-weight: 600;
           background: var(--panel); color: var(--text); letter-spacing: 1px;
           border: 1px solid var(--border); border-radius: 10px; text-transform: uppercase; }
   input:focus { outline: none; border-color: var(--accent); }
@@ -31,15 +32,28 @@
           border: none; border-radius: 10px; cursor: pointer; transition: filter .15s, transform .15s; }
   button#go:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-1px); }
   button#go:disabled { opacity: .45; cursor: default; }
+  .chips { display: flex; gap: 6px; }
+  .chip { padding: 7px 12px; font-size: 13px; font-weight: 600; color: var(--muted);
+          background: var(--panel); border: 1px solid var(--border);
+          border-radius: 999px; cursor: pointer; transition: all .15s; }
+  .chip:hover { color: var(--text); border-color: var(--accent); }
 
-  .stage { position: relative; }
-  .stage::before { content: ""; position: absolute; inset: 8% 18%;
-    background: radial-gradient(ellipse at center, rgba(88,166,255,.07), transparent 65%);
-    pointer-events: none; }
+  /* metrics strip — the numbers behind the README's eval table */
+  .metrics { display: flex; gap: 22px; flex-wrap: wrap; margin: 14px 0 4px;
+             padding: 12px 16px; background: var(--panel); border: 1px solid var(--border);
+             border-radius: 10px; opacity: 0; transition: opacity .3s; }
+  .metrics.on { opacity: 1; }
+  .metric b { display: block; font-size: 17px; font-weight: 700; letter-spacing: -.3px; }
+  .metric span { font-size: 11.5px; color: var(--muted); text-transform: uppercase;
+                 letter-spacing: .6px; }
+
+  .layout { display: grid; grid-template-columns: 1fr 330px; gap: 18px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
   svg#viz { width: 100%; height: auto; display: block; }
-
-  /* --- circle nodes --- */
+  .node { cursor: pointer; }
   .node .body { fill: var(--panel); stroke: var(--border); stroke-width: 2; transition: stroke .3s, fill .3s; }
+  .node:hover .body { fill: var(--panel2); }
   .node .icon { font-size: 26px; opacity: .38; transition: opacity .3s; }
   .node .name { font-size: 13px; fill: var(--muted); font-weight: 600; transition: fill .3s; }
   .node .tag  { font-size: 11px; fill: var(--warn); font-weight: 600; }
@@ -47,17 +61,16 @@
                 transform-box: fill-box; transform-origin: center; }
   .node.active .body { stroke: var(--accent); }
   .node.active .icon, .node.done .icon { opacity: 1; }
-  .node.active .name { fill: var(--text); }
+  .node.active .name, .node.done .name { fill: var(--text); }
   .node.active .halo { animation: ping 1.6s ease-out infinite; }
   .node.done .body { stroke: var(--ok); }
-  .node.done .name { fill: var(--text); }
+  .node.sel .body { stroke: var(--accent2); stroke-width: 3; }
   .node.error .body { stroke: var(--err); }
   .badge { opacity: 0; transition: opacity .3s; }
   .node.done .badge { opacity: 1; }
   @keyframes ping { 0% { transform: scale(1); opacity: .8; }
                     80%, 100% { transform: scale(1.45); opacity: 0; } }
 
-  /* --- arrows --- */
   .arrow { fill: none; stroke: var(--border); stroke-width: 2.5; transition: stroke .3s; }
   .arrow.flow { stroke: var(--accent); stroke-dasharray: 7 7; animation: dash 1s linear infinite; }
   .arrow.done { stroke: var(--ok); opacity: .75; }
@@ -69,7 +82,6 @@
   #revLabel.show { opacity: 1; }
   @keyframes dash { to { stroke-dashoffset: -28; } }
 
-  /* --- center gauge --- */
   #ringTrack { fill: none; stroke: var(--panel2); stroke-width: 13; }
   #ringFill  { fill: none; stroke: url(#ringGrad); stroke-width: 13; stroke-linecap: round;
                transition: stroke-dashoffset .7s cubic-bezier(.4,0,.2,1); }
@@ -78,9 +90,26 @@
   #centerTicker { font-size: 14px; font-weight: 700; fill: var(--accent); letter-spacing: 2px; }
   #centerStatus { font-size: 13px; fill: var(--muted); }
 
-  .legend { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap;
-            color: var(--muted); font-size: 12px; margin: 2px 0 22px; }
-  .legend b { font-weight: 600; color: var(--muted); }
+  /* inspector: what each agent actually produced */
+  .inspect { background: var(--panel); border: 1px solid var(--border);
+             border-radius: 12px; padding: 16px 18px; min-height: 150px;
+             position: sticky; top: 20px; }
+  .inspect h3 { font-size: 14px; margin-bottom: 3px; display: flex; align-items: center; gap: 7px; }
+  .inspect .meta { font-size: 11.5px; color: var(--muted); margin-bottom: 11px; }
+  .inspect .content { font-size: 13px; line-height: 1.6; color: var(--text);
+                      max-height: 340px; overflow-y: auto; white-space: pre-wrap; }
+  .inspect .hint { color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .kv { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0;
+        border-bottom: 1px solid var(--border); font-size: 12.5px; }
+  .kv span:first-child { color: var(--muted); }
+  .kv span:last-child { font-weight: 600; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px;
+          font-size: 10.5px; font-weight: 700; letter-spacing: .4px; }
+  .pill.ok { background: rgba(63,185,80,.15); color: var(--ok); }
+  .pill.warn { background: rgba(210,153,34,.15); color: var(--warn); }
+
+  .legend { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+            color: var(--muted); font-size: 12px; margin: 6px 0 18px; }
   .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
             margin-right: 5px; vertical-align: 1px; }
 
@@ -90,7 +119,13 @@
   .verify { display: none; font-size: 13.5px; color: var(--text);
             background: var(--panel); border: 1px solid var(--border);
             border-left: 3px solid var(--ok); border-radius: 8px;
-            padding: 12px 16px; margin-bottom: 14px; }
+            padding: 12px 16px; margin: 16px 0 14px; }
+  .memo-head { display: none; align-items: center; justify-content: space-between;
+               margin-bottom: 10px; }
+  .memo-head button { padding: 7px 14px; font-size: 12.5px; font-weight: 600;
+                      background: var(--panel); color: var(--text);
+                      border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+  .memo-head button:hover { border-color: var(--accent); }
   #memo { background: var(--panel); border: 1px solid var(--border);
           border-radius: 12px; padding: 30px 34px; line-height: 1.68;
           display: none; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
@@ -111,19 +146,45 @@
   <div class="bar">
     <input id="ticker" placeholder="NVDA" value="NVDA" maxlength="6">
     <button id="go" onclick="run()">Research</button>
+    <div class="chips">
+      <div class="chip" onclick="setTicker('NVDA')">NVDA</div>
+      <div class="chip" onclick="setTicker('AAPL')">AAPL</div>
+      <div class="chip" onclick="setTicker('MSFT')">MSFT</div>
+      <div class="chip" onclick="setTicker('TSLA')">TSLA</div>
+    </div>
+  </div>
+
+  <div class="metrics" id="metrics">
+    <div class="metric"><b id="mTime">0.0s</b><span>elapsed</span></div>
+    <div class="metric"><b id="mCalls">0</b><span>LLM calls</span></div>
+    <div class="metric"><b id="mTokens">0</b><span>tokens</span></div>
+    <div class="metric"><b id="mCost">$0.000</b><span>cost</span></div>
+    <div class="metric"><b id="mRev">0</b><span>revisions</span></div>
   </div>
 
   <div id="error"></div>
-  <div class="stage"><svg id="viz" viewBox="0 0 800 620"></svg></div>
 
-  <div class="legend">
-    <span><b><span class="swatch" style="background:var(--border)"></span>waiting</b></span>
-    <span><b><span class="swatch" style="background:var(--accent)"></span>running</b></span>
-    <span><b><span class="swatch" style="background:var(--ok)"></span>done</b></span>
-    <span><b><span class="swatch" style="background:var(--warn)"></span>revision loop</b></span>
+  <div class="layout">
+    <div>
+      <svg id="viz" viewBox="0 0 800 620"></svg>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--border)"></span>waiting</span>
+        <span><span class="swatch" style="background:var(--accent)"></span>running</span>
+        <span><span class="swatch" style="background:var(--ok)"></span>done</span>
+        <span><span class="swatch" style="background:var(--warn)"></span>revision loop</span>
+      </div>
+    </div>
+    <div class="inspect" id="inspect">
+      <div class="hint">Click any agent in the ring to see exactly what it produced —
+        the data it fetched, the summary it wrote, or the decision it made.</div>
+    </div>
   </div>
 
   <div class="verify" id="verify"></div>
+  <div class="memo-head" id="memoHead">
+    <div style="font-size:13px;color:var(--muted)">Final memo</div>
+    <button onclick="copyMemo()" id="copyBtn">Copy markdown</button>
+  </div>
   <div id="memo"></div>
 </div>
 
@@ -141,6 +202,7 @@ const CX = 400, CY = 310, R = 208, NODE_R = 37, RING_R = 118;
 const svg = document.getElementById("viz");
 const NS = "http://www.w3.org/2000/svg";
 let es = null, completed = new Set(), revised = false;
+let details = {}, memoText = "", timer = null, t0 = 0;
 
 const pos = i => {
   const a = (i * 360 / NODES.length - 90) * Math.PI / 180;
@@ -156,10 +218,11 @@ const el = (tag, attrs, parent) => {
   (parent || svg).appendChild(e);
   return e;
 };
+const esc = s => String(s == null ? "" : s)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 function buildScene() {
   svg.innerHTML = "";
-  // defs: ring gradient + arrowheads
   const defs = el("defs", {});
   const grad = el("linearGradient", { id: "ringGrad", x1: 0, y1: 0, x2: 1, y2: 1 }, defs);
   el("stop", { offset: "0%", "stop-color": "#58a6ff" }, grad);
@@ -170,7 +233,6 @@ function buildScene() {
     el("path", { d: "M0,0 L10,5 L0,10 z", fill: color }, m);
   }
 
-  // arrows between consecutive nodes (along the circle)
   const step = 360 / NODES.length, gap = 15;
   for (let i = 0; i < NODES.length - 1; i++) {
     const a1 = i * step - 90 + gap, a2 = (i + 1) * step - 90 - gap;
@@ -178,7 +240,6 @@ function buildScene() {
     el("path", { id: `arrow-${NODES[i + 1].id}`, class: "arrow", "marker-end": "url(#ahIdle)",
                  d: `M ${x1} ${y1} A ${R} ${R} 0 0 1 ${x2} ${y2}` });
   }
-  // revision arrow: critic (4) back to writer (3), bowed toward the center
   const [wx, wy] = pos(3), [cx2, cy2] = pos(4);
   const mx = CX + (R - 150) * Math.cos((3.5 * step - 90) * Math.PI / 180);
   const my = CY + (R - 150) * Math.sin((3.5 * step - 90) * Math.PI / 180);
@@ -187,7 +248,6 @@ function buildScene() {
   const rl = el("text", { id: "revLabel", x: mx, y: my + 16, "text-anchor": "middle" });
   rl.textContent = "revise";
 
-  // center gauge
   const C = 2 * Math.PI * RING_R;
   el("circle", { id: "ringTrack", cx: CX, cy: CY, r: RING_R });
   el("circle", { id: "ringFill", cx: CX, cy: CY, r: RING_R,
@@ -201,10 +261,10 @@ function buildScene() {
   const t3 = el("text", { id: "centerStatus", x: CX, y: CY + 52, "text-anchor": "middle" });
   t3.textContent = "enter a ticker to start";
 
-  // nodes on top
   NODES.forEach((n, i) => {
     const [x, y, a] = pos(i);
     const g = el("g", { id: `node-${n.id}`, class: "node" });
+    g.addEventListener("click", () => showDetail(n.id));
     el("circle", { class: "halo", cx: x, cy: y, r: NODE_R }, g);
     el("circle", { class: "body", cx: x, cy: y, r: NODE_R }, g);
     const ic = el("text", { class: "icon", x, y: y + 9, "text-anchor": "middle" }, g);
@@ -214,7 +274,6 @@ function buildScene() {
     nm.textContent = n.name;
     const tg = el("text", { class: "tag", id: `tag-${n.id}`, x: lx, y: ly + 20, "text-anchor": "middle" }, g);
     tg.textContent = "";
-    // done badge (small green check at node's top right)
     const b = el("g", { class: "badge" }, g);
     el("circle", { cx: x + 26, cy: y - 26, r: 10, fill: "#3fb950" }, b);
     const ch = el("text", { x: x + 26, y: y - 22, "text-anchor": "middle",
@@ -223,10 +282,68 @@ function buildScene() {
   });
 }
 
-// ---------- state transitions ----------
-const nodeEl = id => document.getElementById(`node-${id}`);
-const arrowEl = id => document.getElementById(`arrow-${id}`);
+// ---------- inspector ----------
+function money(n) {
+  if (n == null) return "—";
+  if (n >= 1e12) return "$" + (n / 1e12).toFixed(2) + "T";
+  if (n >= 1e9) return "$" + (n / 1e9).toFixed(1) + "B";
+  return "$" + Number(n).toLocaleString();
+}
+function showDetail(id) {
+  document.querySelectorAll(".node").forEach(n => n.classList.remove("sel"));
+  const g = document.getElementById(`node-${id}`);
+  if (g) g.classList.add("sel");
+  const node = NODES.find(n => n.id === id);
+  const d = details[id];
+  const box = document.getElementById("inspect");
+  if (!d) {
+    box.innerHTML = `<h3>${node.icon} ${esc(node.name)}</h3>
+      <div class="hint">This agent hasn't run yet. Start a research to see its output.</div>`;
+    return;
+  }
+  let body = "";
+  if (id === "financials") {
+    const f = d.data?.fundamentals || {}, p = d.data?.price || {};
+    body = `<div class="kv"><span>Price</span><span>$${esc(p.price)} (${esc(p.change_pct)}%)</span></div>
+      <div class="kv"><span>Market cap</span><span>${money(f.market_cap)}</span></div>
+      <div class="kv"><span>Trailing P/E</span><span>${esc(f.trailing_pe?.toFixed?.(2) ?? "—")}</span></div>
+      <div class="kv"><span>Profit margin</span><span>${f.profit_margin != null ? (f.profit_margin*100).toFixed(2)+"%" : "—"}</span></div>
+      <div class="kv"><span>Revenue growth</span><span>${f.revenue_growth != null ? (f.revenue_growth*100).toFixed(1)+"%" : "—"}</span></div>
+      <div class="content" style="margin-top:10px">${esc(d.summary)}</div>`;
+  } else if (id === "news") {
+    const hs = (d.headlines || []).map(h => `<div class="kv"><span>•</span><span style="font-weight:400;text-align:left">${esc(h)}</span></div>`).join("");
+    body = hs + `<div class="content" style="margin-top:10px">${esc(d.summary)}</div>`;
+  } else if (id === "risk") {
+    const pill = d.rag_grounded
+      ? `<span class="pill ok">grounded in 10-K</span>`
+      : `<span class="pill warn">no filing indexed — fallback</span>`;
+    body = `<div style="margin-bottom:9px">${pill}</div>
+            <div class="content">${esc(d.summary)}</div>`;
+  } else if (id === "writer") {
+    body = `<div class="kv"><span>Draft length</span><span>${esc(d.words)} words</span></div>
+            <div class="hint" style="margin-top:10px">The writer grounds every claim in the
+            three research agents' output — it never sees raw market data directly.</div>`;
+  } else if (id === "critic") {
+    const pill = d.approved
+      ? `<span class="pill ok">approved</span>`
+      : `<span class="pill warn">revision requested</span>`;
+    body = `<div style="margin-bottom:9px">${pill}</div>
+            <div class="content">${esc(d.feedback) || "No feedback recorded."}</div>`;
+  } else if (id === "verifier") {
+    const pill = d.all_correct
+      ? `<span class="pill ok">all figures matched</span>`
+      : `<span class="pill warn">${(d.mismatches||[]).length} figure(s) corrected</span>`;
+    body = `<div style="margin-bottom:9px">${pill}</div>
+            <div class="content">${(d.mismatches||[]).map(m => "• " + esc(m)).join("\n") ||
+              "Every number in the memo was re-checked against a fresh data pull."}</div>`;
+  } else if (id === "finalize") {
+    body = `<div class="hint">The finished memo is rendered below.</div>`;
+  }
+  box.innerHTML = `<h3>${node.icon} ${esc(node.name)}</h3>
+    <div class="meta">${d.took_s != null ? d.took_s + "s" : ""}</div>${body}`;
+}
 
+// ---------- progress ----------
 function setProgress(statusText) {
   const activeBonus = document.querySelector(".node.active") ? 0.45 : 0;
   const frac = Math.min((completed.size + activeBonus) / NODES.length, 1);
@@ -246,41 +363,63 @@ function animateNumber(target) {
   }, 18);
 }
 function markActive(id) {
-  const n = NODES.find(n => n.id === id);
-  const g = nodeEl(id);
+  const n = NODES.find(n => n.id === id), g = document.getElementById(`node-${id}`);
   if (!g) return;
   g.classList.remove("done"); g.classList.add("active");
-  const a = arrowEl(id);
+  const a = document.getElementById(`arrow-${id}`);
   if (a) { a.setAttribute("class", "arrow flow"); a.setAttribute("marker-end", "url(#ahFlow)"); }
   setProgress(n ? n.run : "");
 }
 function markDone(id) {
-  const g = nodeEl(id);
+  const g = document.getElementById(`node-${id}`);
   if (!g) return;
   g.classList.remove("active"); g.classList.add("done");
   completed.add(id);
-  const a = arrowEl(id);
+  const a = document.getElementById(`arrow-${id}`);
   if (a) { a.setAttribute("class", "arrow done"); a.setAttribute("marker-end", "url(#ahDone)"); }
+}
+function updateMetrics(d) {
+  if (d.usage) {
+    document.getElementById("mCalls").textContent = d.usage.calls;
+    document.getElementById("mTokens").textContent =
+      (d.usage.input_tokens + d.usage.output_tokens).toLocaleString();
+    document.getElementById("mCost").textContent = "$" + d.usage.cost_usd.toFixed(3);
+  }
+  if (d.revision_count != null) document.getElementById("mRev").textContent = d.revision_count;
 }
 
 // ---------- run ----------
+function setTicker(t) { document.getElementById("ticker").value = t; run(); }
+
 function run() {
   const ticker = document.getElementById("ticker").value.trim().toUpperCase() || "NVDA";
   const btn = document.getElementById("go");
   btn.disabled = true;
-  completed = new Set(); revised = false;
-  for (const elId of ["memo", "verify", "error"]) document.getElementById(elId).style.display = "none";
+  completed = new Set(); revised = false; details = {}; memoText = "";
+  for (const id of ["memo", "verify", "error"]) document.getElementById(id).style.display = "none";
+  document.getElementById("memoHead").style.display = "none";
+  document.getElementById("inspect").innerHTML =
+    `<div class="hint">Click any agent in the ring to see exactly what it produced.</div>`;
   buildScene();
   document.getElementById("centerTicker").textContent = ticker;
+  document.getElementById("metrics").classList.add("on");
   markActive("financials");
+
+  t0 = Date.now();
+  clearInterval(timer);
+  timer = setInterval(() => {
+    document.getElementById("mTime").textContent = ((Date.now() - t0) / 1000).toFixed(1) + "s";
+  }, 100);
 
   if (es) es.close();
   es = new EventSource(`/research/stream?ticker=${encodeURIComponent(ticker)}`);
   es.onmessage = (e) => {
     const d = JSON.parse(e.data);
-    if (d.node === "error") { showError(d.message); btn.disabled = false; es.close(); return; }
-    if (d.node === "done")  { btn.disabled = false; es.close(); return; }
+    if (d.node === "error") { showError(d.message); stop(btn); return; }
+    if (d.node === "done")  { updateMetrics(d); stop(btn); return; }
 
+    if (d.detail) { details[d.node] = Object.assign({}, d.detail, { took_s: d.took_s }); }
+    updateMetrics(d);
     markDone(d.node);
 
     if (d.node === "critic" && d.approved === false) {
@@ -288,11 +427,12 @@ function run() {
       document.getElementById("tag-critic").textContent = "revision requested";
       document.getElementById("revArrow").setAttribute("class", "flow");
       document.getElementById("revLabel").classList.add("show");
+      showDetail("critic");
       markActive("writer");
       setProgress("Revision requested — rewriting…");
       return;
     }
-    if (d.node === "critic" && revised) {  // second pass done: park the rev arrow
+    if (d.node === "critic" && revised) {
       document.getElementById("revArrow").setAttribute("class", "was");
     }
     if (d.node === "verifier" && d.verification) {
@@ -300,19 +440,21 @@ function run() {
       elv.style.display = "block";
       elv.innerHTML = v.all_correct
         ? "🔍 <b>Verifier:</b> all figures matched fresh data ✓"
-        : `🔍 <b>Verifier fixed ${v.mismatches.length} figure(s):</b> ${v.mismatches.join("; ")}`;
+        : `🔍 <b>Verifier fixed ${v.mismatches.length} figure(s):</b> ${v.mismatches.map(esc).join("; ")}`;
       elv.style.borderLeftColor = v.all_correct ? "var(--ok)" : "var(--warn)";
       document.getElementById("tag-verifier").textContent =
         v.all_correct ? "" : `${v.mismatches.length} fixed`;
+      showDetail("verifier");
     }
     if (d.node === "finalize") {
       NODES.forEach(n => markDone(n.id));
       setProgress("Memo ready ✓");
       if (d.memo) {
+        memoText = d.memo;
         const m = document.getElementById("memo");
         m.innerHTML = marked.parse(d.memo);
         m.style.display = "block";
-        m.scrollIntoView({ behavior: "smooth", block: "start" });
+        document.getElementById("memoHead").style.display = "flex";
       }
       return;
     }
@@ -320,14 +462,22 @@ function run() {
     const next = order[order.indexOf(d.node) + 1];
     if (next) markActive(next);
   };
-  es.onerror = () => { showError("Connection lost — is the server running?"); btn.disabled = false; es.close(); };
+  es.onerror = () => { showError("Connection lost — is the server running?"); stop(btn); };
 }
+function stop(btn) { btn.disabled = false; clearInterval(timer); if (es) es.close(); }
 function showError(msg) {
   const e = document.getElementById("error");
   e.textContent = msg; e.style.display = "block";
   const act = document.querySelector(".node.active");
   if (act) { act.classList.remove("active"); act.classList.add("error"); }
   document.getElementById("centerStatus").textContent = "error — see above";
+}
+function copyMemo() {
+  navigator.clipboard.writeText(memoText).then(() => {
+    const b = document.getElementById("copyBtn");
+    b.textContent = "Copied ✓";
+    setTimeout(() => b.textContent = "Copy markdown", 1600);
+  });
 }
 document.getElementById("ticker").addEventListener("keydown", e => {
   if (e.key === "Enter" && !document.getElementById("go").disabled) run();
