@@ -435,8 +435,17 @@ function showDetail(id) {
   } else if (id === "finalize") {
     body = `<div class="hint">The finished memo is rendered below.</div>`;
   }
+  // model + spend for this agent alone — makes routing decisions visible
+  const u = d.node_usage || {};
+  const meta = [
+    d.took_s != null ? d.took_s + "s" : null,
+    u.model || null,
+    u.calls ? `${u.calls} call${u.calls > 1 ? "s" : ""}` : null,
+    (u.input_tokens + u.output_tokens) ? `${(u.input_tokens + u.output_tokens).toLocaleString()} tok` : null,
+    u.cost_usd ? "$" + u.cost_usd.toFixed(4) : null,
+  ].filter(Boolean).join(" · ");
   box.innerHTML = `<h3>${node.icon} ${esc(node.name)}</h3>
-    <div class="meta">${d.took_s != null ? d.took_s + "s" : ""}</div>${body}`;
+    <div class="meta">${esc(meta)}</div>${body}`;
 }
 
 // ---------- progress ----------
@@ -517,7 +526,8 @@ function run() {
     if (d.cached) showNotice(d.cache_note || "Cached result — no API cost.");
     if (d.node === "done")  { updateMetrics(d); stop(btn); return; }
 
-    if (d.detail) { details[d.node] = Object.assign({}, d.detail, { took_s: d.took_s }); }
+    if (d.detail) { details[d.node] = Object.assign({}, d.detail,
+      { took_s: d.took_s, node_usage: d.node_usage }); }
     updateMetrics(d);
     markDone(d.node);
 

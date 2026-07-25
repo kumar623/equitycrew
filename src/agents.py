@@ -11,22 +11,21 @@ import json
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
 
-from .config import get_llm, DISABLE_RAG, MAX_REVISIONS
+from .config import AGENT_MODELS, get_llm, DISABLE_RAG, MAX_REVISIONS, MODEL_NAME
 from .state import ResearchState
 from .tools.market_data import get_price, get_fundamentals, get_news
 
-class _LazyLLM:
-    """Defers creating the Anthropic client until first use, so the app can
-    import/start (e.g. FastAPI boot, graph wiring) without a key present."""
-    _inner = None
-
-    def __getattr__(self, name):
-        if _LazyLLM._inner is None:
-            _LazyLLM._inner = get_llm()
-        return getattr(_LazyLLM._inner, name)
+_clients: dict = {}
 
 
-llm = _LazyLLM()
+def llm_for(agent: str):
+    """Client for one agent's configured model, built on first use so the app
+    can import and boot (FastAPI, graph wiring) without a key present.
+    Clients are cached per model, so agents sharing a model share a client."""
+    model = AGENT_MODELS.get(agent, MODEL_NAME)
+    if model not in _clients:
+        _clients[model] = get_llm(model)
+    return _clients[model]
 
 
 def _text(response) -> str:
@@ -57,7 +56,7 @@ def financials_agent(state: ResearchState) -> ResearchState:
         )),
         HumanMessage(content=f"Data:\n{json.dumps(data, indent=2)}"),
     ]
-    summary = _text(llm.invoke(msg))
+    summary = _text(llm_for("financials").invoke(msg))
     return {"financials": {"data": data, "summary": summary}}
 
 
@@ -71,7 +70,7 @@ def news_agent(state: ResearchState) -> ResearchState:
         )),
         HumanMessage(content=f"Headlines:\n{json.dumps(data, indent=2)}"),
     ]
-    summary = _text(llm.invoke(msg))
+    summary = _text(llm_for("news").invoke(msg))
     return {"news": {"data": data, "summary": summary}}
 
 
@@ -116,7 +115,7 @@ def risk_agent(state: ResearchState) -> ResearchState:
             )),
             HumanMessage(content=f"{ticker} fundamentals:\n{json.dumps(fund, indent=2)}"),
         ]
-    return {"risks": _text(llm.invoke(msg))}
+    return {"risks": _text(llm_for("risk").invoke(msg))}
 
 
 # ---------- writer ----------
@@ -142,7 +141,7 @@ def writer_agent(state: ResearchState) -> ResearchState:
         )),
         HumanMessage(content=json.dumps(context, indent=2)),
     ]
-    return {"draft": _text(llm.invoke(msg))}
+    return {"draft": _text(llm_for("writer").invoke(msg))}
 
 
 # ---------- critic (structured decision + loop control) ----------
@@ -153,7 +152,7 @@ class Critique(BaseModel):
 
 
 def critic_agent(state: ResearchState) -> ResearchState:
-    structured = llm.with_structured_output(Critique)
+    structured = llm_for("critic").with_structured_output(Critique)
     msg = [
         SystemMessage(content=(
             "You are a senior reviewer. Check the memo for unsupported claims, missing "
@@ -179,15 +178,22 @@ def route_after_critic(state: ResearchState) -> str:
 
 # ---------- verifier (self-correcting numeric check) ----------
 
+class Correction(BaseModel):
+    find: str = Field(
+        description="The exact incorrect text as it appears in the memo, copied "
+                    "character for character (e.g. '$210.77' or '32.28x').")
+    replace: str = Field(
+        description="What that text should say according to the fresh data.")
+    note: str = Field(description="Short human-readable description of the fix.")
+
+
 class Verification(BaseModel):
     all_numbers_correct: bool = Field(
         description="True if every figure in the memo matches the fresh data.")
-    corrected_memo: str = Field(
-        description="The memo with any incorrect figures fixed. If all correct, "
-                    "return the memo unchanged.")
-    mismatches: list[str] = Field(
+    corrections: list[Correction] = Field(
         default_factory=list,
-        description="List of figures that were wrong and how they were fixed.")
+        description="One entry per figure that disagrees with the fresh data. "
+                    "Return an empty list if everything matches.")
 
 
 def verifier_agent(state: ResearchState) -> ResearchState:
@@ -198,28 +204,39 @@ def verifier_agent(state: ResearchState) -> ResearchState:
         "price": get_price(ticker),
         "fundamentals": get_fundamentals(ticker),
     }
-    structured = llm.with_structured_output(Verification)
+    structured = llm_for("verifier").with_structured_output(Verification)
     msg = [
         SystemMessage(content=(
             "You are a fact-checker. Compare every numeric claim in the memo against "
-            "the FRESH data provided (the single source of truth). Fix any figure "
-            "that does not match. Do not change analysis or wording otherwise."
+            "the FRESH data provided (the single source of truth). For each figure "
+            "that does not match, return a correction whose 'find' is the exact text "
+            "as it appears in the memo. Do not rewrite the memo and do not change "
+            "analysis or wording — return corrections only."
         )),
         HumanMessage(content=(
             f"FRESH DATA:\n{json.dumps(fresh, indent=2)}\n\nMEMO:\n{state['draft']}"
         )),
     ]
     result: Verification = structured.invoke(msg)
-    # Guard: a truncated/malformed structured response must never replace a
-    # full memo with a fragment — keep the original draft in that case.
-    corrected = result.corrected_memo or ""
-    if len(corrected) < 0.5 * len(state["draft"]):
-        corrected = state["draft"]
+
+    # Apply the patches here rather than having the model re-emit the memo:
+    # ~1,400 fewer output tokens per run, and a malformed response can no
+    # longer truncate or destroy the draft — the worst case is no edit.
+    draft = state["draft"]
+    applied, unapplied = [], []
+    for c in result.corrections:
+        if c.find and c.find in draft:
+            draft = draft.replace(c.find, c.replace, 1)
+            applied.append(f"{c.note} ({c.find} → {c.replace})")
+        elif c.find:
+            unapplied.append(f"{c.note} (could not locate “{c.find}” in the memo)")
+
     return {
-        "draft": corrected,
+        "draft": draft,
         "verification": {
-            "all_correct": result.all_numbers_correct,
-            "mismatches": result.mismatches,
+            "all_correct": result.all_numbers_correct and not applied,
+            "mismatches": applied,
+            "unapplied": unapplied,
         },
     }
 

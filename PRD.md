@@ -119,8 +119,8 @@ CLI / FastAPI / MCP client
 | Numeric accuracy | ≥ 95% | 94% (NVDA) / 96% (AAPL) — **borderline** |
 | Critic catch-rate | ≥ 80% | 100% |
 | Memo completeness | 100% | 100% (10/10 runs, all six sections) |
-| Latency | < 120 s | mean 86.1s; one run hit 128.5s under CPU contention |
-| Cost per memo | < $0.15 | $0.101 mean |
+| Latency | < 120 s | 53s after cost work (was mean 86.1s) |
+| Cost per memo | < $0.15 | $0.074 after cost work (was $0.101) |
 | Demo reliability | 10/10 | 10/10 |
 
 ## 10. Risks & mitigations

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from langchain_core.callbacks import BaseCallbackHandler
 
-from .config import PRICE_IN_PER_MTOK, PRICE_OUT_PER_MTOK
+from .config import MODEL_PRICES, PRICE_IN_PER_MTOK, PRICE_OUT_PER_MTOK
 
 
 class UsageTracker(BaseCallbackHandler):
@@ -13,19 +13,27 @@ class UsageTracker(BaseCallbackHandler):
         self.input_tokens = 0
         self.output_tokens = 0
         self.calls = 0
+        self.cost_usd_acc = 0.0   # priced per call, since models differ per agent
 
     def on_llm_end(self, response, **kwargs):
+        # Which model answered — agents may run on different tiers.
+        model = ((response.llm_output or {}).get("model_name")
+                 or (response.llm_output or {}).get("model") or "")
+        price_in, price_out = MODEL_PRICES.get(
+            model, (PRICE_IN_PER_MTOK, PRICE_OUT_PER_MTOK))
         for gens in response.generations:
             for g in gens:
                 usage = getattr(getattr(g, "message", None), "usage_metadata", None) or {}
-                self.input_tokens += usage.get("input_tokens", 0)
-                self.output_tokens += usage.get("output_tokens", 0)
+                tin = usage.get("input_tokens", 0)
+                tout = usage.get("output_tokens", 0)
+                self.input_tokens += tin
+                self.output_tokens += tout
+                self.cost_usd_acc += tin / 1e6 * price_in + tout / 1e6 * price_out
                 self.calls += 1
 
     @property
     def cost_usd(self) -> float:
-        return (self.input_tokens / 1e6 * PRICE_IN_PER_MTOK
-                + self.output_tokens / 1e6 * PRICE_OUT_PER_MTOK)
+        return self.cost_usd_acc
 
     def snapshot(self) -> dict:
         return {

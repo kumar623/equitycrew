@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
 from src import limits
+from src.config import AGENT_MODELS
 from src.graph import build_graph
 from src.tools.market_data import resolve_ticker
 from src.usage import UsageTracker
@@ -128,6 +129,7 @@ def research_stream(ticker: str, request: Request):
             emitted: list = []
             t0 = time.time()
             last = t0
+            prev = tracker.snapshot()
             for event in graph.stream(
                 {"ticker": ticker.upper(), "revision_count": 0},
                 stream_mode="updates",
@@ -136,7 +138,19 @@ def research_stream(ticker: str, request: Request):
                 for node, update in event.items():
                     state.update(update or {})
                     now = time.time()
+                    # Nodes run sequentially, so the delta since the previous
+                    # yield is exactly this agent's own spend.
+                    snap = tracker.snapshot()
+                    node_usage = {
+                        "calls": snap["calls"] - prev["calls"],
+                        "input_tokens": snap["input_tokens"] - prev["input_tokens"],
+                        "output_tokens": snap["output_tokens"] - prev["output_tokens"],
+                        "cost_usd": round(snap["cost_usd"] - prev["cost_usd"], 5),
+                        "model": AGENT_MODELS.get(node),
+                    }
+                    prev = snap
                     payload = {
+                        "node_usage": node_usage,
                         "node": node,
                         "label": NODE_LABELS.get(node, node),
                         "approved": state.get("approved"),

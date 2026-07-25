@@ -59,8 +59,28 @@ critic. Latest report (`data/evals/`, claude-sonnet-5, list pricing):
 | Numeric accuracy | **94%** | **96%** | every financial figure regex-extracted from the memo and matched against tool data |
 | Verifier catch-rate | **100%** (4/4) | **100%** (4/4) | numeric errors planted in the memo; counts how many the verifier fixes |
 | Critic catch-rate | **100%** | **100%** | sabotaged memos (missing rating, unsupported claim, truncated) must be rejected |
-| Latency | **70s** | **54s** | full 7-node run, end to end |
-| Cost | **$0.102** | **$0.090** | token usage tracked per LLM call via a LangChain callback |
+| Latency | **53s** | **54s** | full 7-node run, end to end |
+| Cost | **$0.074** | **$0.090** | token usage tracked per LLM call via a LangChain callback |
+
+### Cost engineering
+
+Per-agent cost attribution (the UI shows it live, per agent) found the spend was
+not where intuition said. The three "trivial" summarising agents were 15% of the
+bill combined, while the verifier alone was 35% — because it echoed the entire
+memo back just to fix a couple of numbers.
+
+Two changes, measured rather than assumed:
+
+- **Verifier returns patches, not prose.** It now emits `find`/`replace` pairs
+  that Python applies, cutting ~1,400 output tokens per run. This also removed a
+  failure mode: a malformed response used to be able to truncate the memo (it
+  once did), so the code carried a length guard. Now the worst case is no edit.
+- **Model routing per agent.** Financials and news run on Haiku 4.5; the writer,
+  critic, verifier and risk agents stay on Sonnet 5, since those are the
+  judgement calls and the last line of defence against a wrong number shipping.
+
+Together: **$0.102 → $0.074 per memo (−27%) and 70s → 53s (−24%)**, with the
+verifier and critic catch-rates unchanged at 100%.
 
 Honest caveat, also in the report JSON: the critic is strict enough that it
 sometimes rejects the clean memo too. In the pipeline that is harmless — it
