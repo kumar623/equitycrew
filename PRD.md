@@ -79,11 +79,12 @@ CLI / FastAPI / MCP client
         │
         ▼
   LangGraph state graph
-  START → financials → news → risk → writer → critic ─(approve/cap)→ finalize → END
-                                          └──(revise ×1)──→ writer
+  START ─┬→ financials ─┐
+         ├→ news       ─┼→ writer → critic ─(approve/cap)→ verifier → finalize → END
+         └→ risk       ─┘            └──(revise ×1)──→ writer
         │
         ▼ tools (only source of numbers)
-  get_price · get_fundamentals · get_news   (yfinance / Finnhub)
+  get_price · get_fundamentals · get_news   (yfinance)
   [v1.1] vector store (Chroma/FAISS) ← 10-K ingestion
 ```
 
@@ -119,7 +120,7 @@ CLI / FastAPI / MCP client
 | Numeric accuracy | ≥ 95% | 94% (NVDA) / 96% (AAPL) — **borderline** |
 | Critic catch-rate | ≥ 80% | 100% |
 | Memo completeness | 100% | 100% (10/10 runs, all six sections) |
-| Latency | < 120 s | 53s after cost work (was mean 86.1s) |
+| Latency | < 120 s | 50s (34.5s when the critic approves first pass) |
 | Cost per memo | < $0.15 | $0.074 after cost work (was $0.101) |
 | Demo reliability | 10/10 | 10/10 |
 

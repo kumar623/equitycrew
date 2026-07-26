@@ -28,8 +28,10 @@ revision loop. Tools are also exposed over **MCP**.
 Give it a ticker (`NVDA`) and a crew of specialized agents collaborates:
 
 ```
-START → financials → news → risk → writer → critic ─(approve)→ finalize → END
-                                        └─(revise, capped)→ writer
+START ─┬→ financials ─┐
+       ├→ news       ─┼→ writer → critic ─(approve)→ verifier → finalize → END
+       └→ risk       ─┘            └─(revise, capped)→ writer
+       (parallel: no shared data)
 ```
 
 - **Financials agent** — pulls live price + fundamentals, summarizes them
