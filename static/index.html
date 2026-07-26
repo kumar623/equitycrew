@@ -297,6 +297,7 @@ const NODES = [
 const CX = 400, CY = 310, R = 208, NODE_R = 37, RING_R = 118;
 const svg = document.getElementById("viz");
 const NS = "http://www.w3.org/2000/svg";
+const RESEARCH = ["financials", "news", "risk"];
 let es = null, completed = new Set(), revised = false;
 let details = {}, memoText = "", timer = null, t0 = 0;
 
@@ -508,7 +509,7 @@ function run() {
   buildScene();
   document.getElementById("centerTicker").textContent = ticker;
   document.getElementById("metrics").classList.add("on");
-  markActive("financials");
+  RESEARCH.forEach(markActive);
 
   t0 = Date.now();
   clearInterval(timer);
@@ -563,6 +564,13 @@ function run() {
         renderMemo(d.memo);
         document.getElementById("memoHead").style.display = "flex";
       }
+      return;
+    }
+    // The three research agents run concurrently and can finish in any order,
+    // so the writer only lights up once all of them are done.
+    if (RESEARCH.includes(d.node)) {
+      if (RESEARCH.every(r => completed.has(r))) markActive("writer");
+      else setProgress("Researching in parallel…");
       return;
     }
     const order = NODES.map(n => n.id);

@@ -2,8 +2,10 @@ r"""Wire the agents into a LangGraph state graph.
 
 Flow:
     START
-      -> financials -> news -> risk   (research; risk uses RAG when 10-K indexed)
-      -> writer
+      -> financials ┐
+      -> news       ├─ (research, run in parallel — they share no data)
+      -> risk       ┘   risk uses RAG when a 10-K is indexed
+      -> writer         (waits for all three)
       -> critic --(approve or max revisions)--> verifier -> finalize -> END
                  \--(revise)-------------------> writer   (loop, capped)
 
@@ -33,10 +35,12 @@ def build_graph():
     g.add_node("verifier", verifier_agent)
     g.add_node("finalize", finalize)
 
-    g.add_edge(START, "financials")
-    g.add_edge("financials", "news")
-    g.add_edge("news", "risk")
-    g.add_edge("risk", "writer")
+    # Fan out: the three research agents are independent, so LangGraph runs
+    # them in one superstep instead of a 3-call chain. Each writes a different
+    # state key, so their updates cannot collide.
+    for research in ("financials", "news", "risk"):
+        g.add_edge(START, research)
+        g.add_edge(research, "writer")   # fan in: writer waits for all three
     g.add_edge("writer", "critic")
     g.add_conditional_edges(
         "critic", route_after_critic,

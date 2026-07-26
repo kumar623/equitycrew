@@ -106,7 +106,10 @@ def risk_agent(state: ResearchState) -> ResearchState:
             HumanMessage(content=f"{ticker} 10-K excerpts:\n{context}"),
         ]
     else:
-        fund = state.get("financials", {}).get("data", {})
+        # Fetch rather than read from state: the research agents run in
+        # parallel, so financials may not have landed yet. One cheap tool call
+        # buys independence, and this path only runs when no 10-K is indexed.
+        fund = get_fundamentals(ticker)
         msg = [
             SystemMessage(content=(
                 "You are a risk analyst. In 2-3 sentences, list the key risks/red flags "

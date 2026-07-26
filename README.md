@@ -60,7 +60,7 @@ critic. Latest report (`data/evals/`, claude-sonnet-5, list pricing):
 | Numeric accuracy | **94%** | **96%** | every financial figure regex-extracted from the memo and matched against tool data |
 | Verifier catch-rate | **100%** (4/4) | **100%** (4/4) | numeric errors planted in the memo; counts how many the verifier fixes |
 | Critic catch-rate | **100%** | **100%** | sabotaged memos (missing rating, unsupported claim, truncated) must be rejected |
-| Latency | **53s** | **54s** | full 7-node run, end to end |
+| Latency | **50s** | **54s** | full 7-node run, end to end (34.5s on a run with no revision) |
 | Cost | **$0.074** | **$0.090** | token usage tracked per LLM call via a LangChain callback |
 
 ### Cost engineering
@@ -82,6 +82,12 @@ Two changes, measured rather than assumed:
 
 Together: **$0.102 → $0.074 per memo (−27%) and 70s → 53s (−24%)**, with the
 verifier and critic catch-rates unchanged at 100%.
+
+**Parallel research.** The financials, news and risk agents share no data, so
+they now fan out from START and the writer waits for all three. Verified from
+per-node timings: the three finish within 2.9s of each other, so the research
+phase costs the slowest agent rather than the sum. What remains is writer →
+critic → verifier, which is inherently sequential.
 
 Honest caveat, also in the report JSON: the critic is strict enough that it
 sometimes rejects the clean memo too. In the pipeline that is harmless — it

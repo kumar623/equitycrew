@@ -136,5 +136,5 @@ CLI / FastAPI / MCP client
 ## 11. Open questions
 
 1. Chroma vs. FAISS for the vector store (leaning FAISS — named in target JDs).
-2. Run research agents in parallel (latency win) vs. sequential (simplicity) — revisit at M4 with latency data.
+2. ~~Run research agents in parallel vs. sequential~~ — **resolved:** parallel. They share no state, so they fan out from START and the writer joins them. Per-node timings confirm they complete within ~3s of each other.
 3. Which 10-K source: SEC EDGAR full-text (free) vs. pre-downloaded PDFs — decide at M3.
