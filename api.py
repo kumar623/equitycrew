@@ -130,11 +130,31 @@ def research_stream(ticker: str, request: Request):
             t0 = time.time()
             last = t0
             prev = tracker.snapshot()
-            for event in graph.stream(
+            for mode, event in graph.stream(
                 {"ticker": ticker.upper(), "revision_count": 0},
-                stream_mode="updates",
+                # A list of modes makes LangGraph yield (mode, payload) tuples.
+                # "messages" carries LLM tokens as they are generated, which is
+                # what lets the memo appear ~30s before the run finishes.
+                stream_mode=["updates", "messages"],
                 config={"callbacks": [tracker]},
             ):
+                if mode == "messages":
+                    chunk, meta = event
+                    # Only the writer's prose is worth showing live; the other
+                    # agents emit summaries the UI already renders elsewhere.
+                    if meta.get("langgraph_node") == "writer":
+                        text = chunk.content
+                        if not isinstance(text, str):   # adaptive thinking can
+                            text = "".join(            # return content blocks
+                                b.get("text", "") for b in text
+                                if isinstance(b, dict) and b.get("type") == "text"
+                            )
+                        if text:
+                            # Deliberately not appended to `emitted`: the cache
+                            # replays node events, not thousands of tokens.
+                            yield f"data: {json.dumps({'node': 'token', 'text': text})}\n\n"
+                    continue
+
                 for node, update in event.items():
                     state.update(update or {})
                     now = time.time()
