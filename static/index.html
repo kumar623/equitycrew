@@ -665,6 +665,7 @@ function run() {
     }
     if (d.node === "writer") document.getElementById("draft").classList.add("settled");
     if (d.node === "finalize") {
+      document.querySelectorAll(".pulse-dot").forEach(p => p.remove());
       document.getElementById("draft").style.display = "none";
       NODES.forEach(n => markDone(n.id));
       setProgress("Memo ready ✓");
@@ -688,7 +689,14 @@ function run() {
   };
   es.onerror = () => { showError("Connection lost — is the server running?"); stop(btn); };
 }
-function stop(btn) { btn.disabled = false; clearInterval(timer); if (es) es.close(); }
+function stop(btn) {
+  btn.disabled = false;
+  clearInterval(timer);
+  if (es) es.close();
+  // no node activates after the final one, so the last pulse would otherwise
+  // keep travelling its arrow forever
+  document.querySelectorAll(".pulse-dot").forEach(p => p.remove());
+}
 function showError(msg) {
   const e = document.getElementById("error");
   // reset the palette explicitly — showNotice may have left it amber
