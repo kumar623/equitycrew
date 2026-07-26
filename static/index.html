@@ -99,6 +99,12 @@
   .arrow { fill: none; stroke: var(--border); stroke-width: 2.5; transition: stroke .3s; }
   .arrow.flow { stroke: var(--accent); stroke-dasharray: 7 7; animation: dash 1s linear infinite; }
   .arrow.done { stroke: var(--ok); opacity: .75; }
+  /* a "tie" links agents that run together — dotted, no arrowhead, no motion,
+     so it never reads as a handoff from one to the next */
+  .arrow.tie { stroke-dasharray: 2 6; stroke-width: 2; opacity: .38; animation: none; }
+  .arrow.tie.done { stroke: var(--ok); opacity: .5; }
+  .tie-swatch { display: inline-block; width: 16px; height: 0; margin-right: 5px;
+                vertical-align: 3px; border-top: 2px dotted var(--muted); opacity: .8; }
   #revArrow { fill: none; stroke: var(--warn); stroke-width: 2.5; stroke-dasharray: 7 7;
               opacity: 0; transition: opacity .3s; }
   #revArrow.flow { opacity: 1; animation: dash 1s linear infinite; }
@@ -308,6 +314,7 @@
         <span><span class="swatch" style="background:var(--accent)"></span>running</span>
         <span><span class="swatch" style="background:var(--ok)"></span>done</span>
         <span><span class="swatch" style="background:var(--warn)"></span>revision loop</span>
+        <span><span class="tie-swatch"></span>run in parallel</span>
       </div>
       <!-- concrete facts as they land — never invented filler -->
       <div class="feed" id="feed"></div>
@@ -389,8 +396,16 @@ function buildScene() {
   for (let i = 0; i < NODES.length - 1; i++) {
     const a1 = i * step - 90 + gap, a2 = (i + 1) * step - 90 - gap;
     const [x1, y1] = onCircle(a1, R), [x2, y2] = onCircle(a2, R);
-    el("path", { id: `arrow-${NODES[i + 1].id}`, class: "arrow", "marker-end": "url(#ahIdle)",
-                 d: `M ${x1} ${y1} A ${R} ${R} 0 0 1 ${x2} ${y2}` });
+    // financials/news and news/risk are NOT handoffs — those three agents run
+    // concurrently. Draw them as a plain tie with no arrowhead so the picture
+    // does not claim an ordering the graph does not have.
+    const concurrent = RESEARCH.includes(NODES[i].id) && RESEARCH.includes(NODES[i + 1].id);
+    el("path", {
+      id: `arrow-${NODES[i + 1].id}`,
+      class: concurrent ? "arrow tie" : "arrow",
+      ...(concurrent ? {} : { "marker-end": "url(#ahIdle)" }),
+      d: `M ${x1} ${y1} A ${R} ${R} 0 0 1 ${x2} ${y2}`,
+    });
   }
   const [wx, wy] = pos(3), [cx2, cy2] = pos(4);
   const mx = CX + (R - 150) * Math.cos((3.5 * step - 90) * Math.PI / 180);
@@ -528,7 +543,10 @@ function markActive(id) {
   if (!g) return;
   g.classList.remove("done"); g.classList.add("active");
   const a = document.getElementById(`arrow-${id}`);
-  if (a) { a.setAttribute("class", "arrow flow"); a.setAttribute("marker-end", "url(#ahFlow)"); }
+  if (a && !a.classList.contains("tie")) {
+    a.setAttribute("class", "arrow flow");
+    a.setAttribute("marker-end", "url(#ahFlow)");
+  }
   pulseAlong(id);
   setProgress(n ? n.run : "");
 }
@@ -538,7 +556,11 @@ function markDone(id) {
   g.classList.remove("active"); g.classList.add("done");
   completed.add(id);
   const a = document.getElementById(`arrow-${id}`);
-  if (a) { a.setAttribute("class", "arrow done"); a.setAttribute("marker-end", "url(#ahDone)"); }
+  if (a) {
+    const tie = a.classList.contains("tie");
+    a.setAttribute("class", tie ? "arrow tie done" : "arrow done");
+    if (!tie) a.setAttribute("marker-end", "url(#ahDone)");
+  }
 }
 function updateMetrics(d) {
   if (d.usage) {
@@ -833,7 +855,8 @@ function feedFor(node, d) {
 function pulseAlong(nodeId) {
   document.querySelectorAll(".pulse-dot").forEach(p => p.remove());
   const path = document.getElementById(`arrow-${nodeId}`);
-  if (!path || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (!path || path.classList.contains("tie")) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const dot = el("circle", { class: "pulse-dot", r: 4.5 });
   const anim = el("animateMotion", { dur: "1.5s", repeatCount: "indefinite" }, dot);
   el("mpath", { href: `#arrow-${nodeId}` }, anim);
