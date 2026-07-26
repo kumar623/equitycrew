@@ -54,7 +54,7 @@ Manual equity research is slow: an analyst reads filings, gathers prices and new
 | F3 | News agent fetches recent headlines and summarizes sentiment | P0 |
 | F4 | Risk agent identifies key risks; v1.1 grounds this in the 10-K via RAG with citations | P0 (RAG P1) |
 | F5 | Writer agent produces memo: Thesis, Fundamentals, News & Sentiment, Key Risks, Bull vs Bear, Rating | P0 |
-| F6 | Critic agent reviews draft (structured output), approves or returns feedback; max 1 revision loop | P0 |
+| F6 | Critic agent reviews draft (structured output), approves or returns feedback; max 1 revision loop | P0 — was silently broken by an off-by-one until 2026-07-26; now fixed and covered by an integration test |
 | F7 | All numeric claims sourced from tool outputs; agent prompts forbid invented figures | P0 |
 | F8 | MCP server exposes price, fundamentals, news, full_analysis | P0 |
 | F9 | Eval harness: numeric accuracy vs. ground truth; critic catch-rate on injected errors; latency & cost per memo | P1 |
@@ -117,11 +117,11 @@ CLI / FastAPI / MCP client
 
 | Metric | Target | Actual |
 |---|---|---|
-| Numeric accuracy | ≥ 95% | 94% (NVDA) / 96% (AAPL) — **borderline** |
+| Numeric accuracy | ≥ 95% | 94–100% across runs; sits on the target rather than above it |
 | Critic catch-rate | ≥ 80% | 100% |
 | Memo completeness | 100% | 100% (10/10 runs, all six sections) |
-| Latency | < 120 s | 50s (34.5s when the critic approves first pass) |
-| Cost per memo | < $0.15 | $0.074 after cost work (was $0.101) |
+| Latency | < 120 s | 37s |
+| Cost per memo | < $0.15 | $0.068 (was $0.101) |
 | Demo reliability | 10/10 | 10/10 |
 
 ## 10. Risks & mitigations

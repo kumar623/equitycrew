@@ -62,8 +62,8 @@ critic. Latest report (`data/evals/`, claude-sonnet-5, list pricing):
 | Numeric accuracy | **94%** | **96%** | every financial figure regex-extracted from the memo and matched against tool data |
 | Verifier catch-rate | **100%** (4/4) | **100%** (4/4) | numeric errors planted in the memo; counts how many the verifier fixes |
 | Critic catch-rate | **100%** | **100%** | sabotaged memos (missing rating, unsupported claim, truncated) must be rejected |
-| Latency | **50s** | **54s** | full 7-node run, end to end (34.5s on a run with no revision) |
-| Cost | **$0.074** | **$0.090** | token usage tracked per LLM call via a LangChain callback |
+| Latency | **37s** | **54s** | full 7-node run, end to end |
+| Cost | **$0.068** | **$0.090** | token usage tracked per LLM call via a LangChain callback |
 
 ### Cost engineering
 
@@ -91,10 +91,32 @@ per-node timings: the three finish within 2.9s of each other, so the research
 phase costs the slowest agent rather than the sum. What remains is writer →
 critic → verifier, which is inherently sequential.
 
-Honest caveat, also in the report JSON: the critic is strict enough that it
-sometimes rejects the clean memo too. In the pipeline that is harmless — it
-triggers the capped revision loop — but it means the critic optimizes for recall
-over precision, and the harness records that rather than hiding it.
+### The critic, and a bug worth documenting
+
+The revision loop did not work for most of this project's life. `route_after_critic`
+compared `revision_count >= MAX_REVISIONS`, but the critic increments that counter
+for the very rejection being routed on — so with a budget of one revision, the
+first rejection already looked like the budget was spent and the graph skipped
+straight to the verifier. **The writer never saw the feedback.** The symptom was
+visible in the metrics all along: every run was exactly 6 LLM calls, one per agent.
+The comparison is now `>`, and an integration test with stub nodes asserts the
+writer actually runs twice.
+
+Fixing that exposed a second problem. The critic rejected almost every draft,
+demanding citations for figures that came from live tool calls — because it only
+ever received the draft, never the research, so it could not tell a grounded
+number from an invented one. It now receives both, and is told that a verifier
+re-checks every figure downstream.
+
+Section completeness moved out of the prompt entirely. Whether a memo contains a
+rating is a fact, not a judgement, and the LLM proved unreliable at it — it read a
+memo with the rating stripped out and approved it. `structural_defects()` checks
+that in code, so those defects are impossible to miss and cost no API call. The
+LLM critic now judges only what needs judgement: unsupported claims and
+contradictions.
+
+Result: catch-rate went from 67% to 100% while the clean memo went from rejected
+to approved — fewer false positives *and* fewer false negatives.
 
 ### Reliability
 

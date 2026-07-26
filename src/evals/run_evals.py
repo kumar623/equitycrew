@@ -61,18 +61,25 @@ def eval_ticker(ticker: str) -> dict:
     verifier_catch = caught / len(planted) if planted else None
     console.print(f"verifier catch-rate: {caught}/{len(planted)} planted errors fixed")
 
-    # 3. critic catch-rate: broken memos should be rejected, the real one approved
+    # 3. critic catch-rate: broken memos should be rejected, the real one approved.
+    # Pass the research the critic sees in the real pipeline; without it the
+    # critic cannot distinguish a grounded figure from an invented one.
+    research_ctx = {
+        "financials": state.get("financials"),
+        "news": state.get("news"),
+        "risks": state.get("risks"),
+    }
     rejected, variants = 0, critic_sabotage_variants(memo)
     for name, bad_memo in variants.items():
         try:
-            result = critic_agent({"draft": bad_memo, "revision_count": 0})
+            result = critic_agent({"draft": bad_memo, "revision_count": 0, **research_ctx})
         except Exception as e:  # a bad variant must not sink the whole (paid) run
             console.print(f"critic vs {name}: ERROR ({e})")
             continue
         if not result["approved"]:
             rejected += 1
         console.print(f"critic vs {name}: {'rejected ✓' if not result['approved'] else 'APPROVED ✗'}")
-    clean = critic_agent({"draft": memo, "revision_count": 0})
+    clean = critic_agent({"draft": memo, "revision_count": 0, **research_ctx})
     console.print(f"critic vs clean memo: {'approved ✓' if clean['approved'] else 'REJECTED ✗'}")
 
     return {

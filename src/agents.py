@@ -7,6 +7,7 @@ Design rules:
 """
 from __future__ import annotations
 import json
+import re
 
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
@@ -154,14 +155,82 @@ class Critique(BaseModel):
     feedback: str = Field(description="Specific issues to fix if not approved.")
 
 
+#: (label, pattern that must appear somewhere in the memo)
+REQUIRED_SECTIONS = [
+    ("Thesis", r"thesis"),
+    ("Fundamentals", r"fundamental"),
+    ("News & Sentiment", r"news|sentiment"),
+    ("Key Risks", r"risk"),
+    ("Bull vs Bear", r"bull"),
+    ("Rating", r"\b(buy|hold|sell)\b"),
+]
+
+
+def structural_defects(memo: str) -> list:
+    """Deterministic completeness check.
+
+    Whether a section exists is a fact, not a judgement, and an LLM asked to
+    check it is unreliable — it read a memo with the rating stripped out and
+    approved it anyway. Checking in code makes that class of defect impossible
+    to miss, and saves an LLM call when the draft is obviously broken.
+    """
+    low = (memo or "").lower()
+    missing = [label for label, pat in REQUIRED_SECTIONS if not re.search(pat, low)]
+    defects = [f"Missing required section: {m}" for m in missing]
+    if len((memo or "").split()) < 150:
+        defects.append("Memo is too short to be complete — likely truncated.")
+    return defects
+
+
 def critic_agent(state: ResearchState) -> ResearchState:
+    # Structure first: cheap, certain, and no API call when it fails.
+    defects = structural_defects(state.get("draft", ""))
+    if defects:
+        count = state.get("revision_count", 0)
+        return {
+            "approved": False,
+            "critique": "The draft is structurally incomplete. "
+                        + " ".join(defects)
+                        + " Rewrite the memo with every required section present.",
+            "revision_count": count + 1,
+        }
+
     structured = llm_for("critic").with_structured_output(Critique)
+    # The critic used to see the draft alone. It therefore could not tell a
+    # grounded figure from an invented one, and rejected almost every memo
+    # demanding citations for numbers that came from live tool calls. Giving
+    # it the research makes "unsupported claim" an answerable question.
+    research = {
+        "financials": state.get("financials", {}).get("summary"),
+        "news": state.get("news", {}).get("summary"),
+        "risks": state.get("risks"),
+    }
     msg = [
         SystemMessage(content=(
-            "You are a senior reviewer. Check the memo for unsupported claims, missing "
-            "sections, or invented numbers. Approve only if solid."
+            "You are a senior reviewer deciding whether an investment memo is fit to "
+            "publish. You are given the research the writer worked from, and the draft.\n\n"
+            "Context you need: every figure in the research came from live market-data "
+            "tool calls made by this system, and a separate verifier re-checks each "
+            "number against a fresh data pull after you. So do NOT ask for inline "
+            "citations, sources or as-of dates for figures — that is already handled.\n\n"
+            "First, check completeness mechanically. The memo must contain all six "
+            "sections — thesis, fundamentals, news/sentiment, key risks, bull vs bear, "
+            "and a rating — and the rating must state an explicit Buy, Hold or Sell. "
+            "If any section is absent, or no explicit Buy/Hold/Sell verdict appears, "
+            "reject. Do not infer a missing section from related prose elsewhere.\n\n"
+            "Then reject for any other substantive defect:\n"
+            "  - a figure or fact appears in the memo but not in the research\n"
+            "  - a claim contradicts the research or another part of the memo\n"
+            "  - the rating is unsupported by the reasoning given\n"
+            "  - the memo is truncated or structurally broken\n\n"
+            "If the memo is complete, internally consistent and grounded in the "
+            "research, approve it. Do not withhold approval over style, tone, hedging, "
+            "or extra caveats you would have worded differently."
         )),
-        HumanMessage(content=state["draft"]),
+        HumanMessage(content=(
+            f"RESEARCH THE WRITER WAS GIVEN:\n{json.dumps(research, indent=2)}\n\n"
+            f"DRAFT MEMO:\n{state['draft']}"
+        )),
     ]
     result: Critique = structured.invoke(msg)
     count = state.get("revision_count", 0)
@@ -173,8 +242,14 @@ def critic_agent(state: ResearchState) -> ResearchState:
 
 
 def route_after_critic(state: ResearchState) -> str:
-    """Conditional edge: approve -> finalize, else revise (until cap)."""
-    if state.get("approved") or state.get("revision_count", 0) >= MAX_REVISIONS:
+    """Conditional edge: approve -> finalize, else revise (until cap).
+
+    The comparison is `>` and not `>=` on purpose. The critic has already
+    incremented revision_count for the rejection being routed on, so `>=`
+    would treat the very first rejection as having exhausted the budget and
+    skip the rewrite entirely — MAX_REVISIONS=1 would permit zero revisions.
+    """
+    if state.get("approved") or state.get("revision_count", 0) > MAX_REVISIONS:
         return "finalize"
     return "revise"
 
