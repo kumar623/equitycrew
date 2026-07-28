@@ -80,18 +80,16 @@ def risk_agent(state: ResearchState) -> ResearchState:
     to reasoning over live fundamentals."""
     ticker = state["ticker"]
 
-    passages = []
+    passages: list = []
+    telemetry: dict = {"grounded": False, "passages": []}
     try:
         if DISABLE_RAG:
             raise RuntimeError("RAG disabled by EQUITYCREW_DISABLE_RAG")
-        from .rag.retriever import retrieve
-        passages = retrieve(
-            ticker,
-            "risk factors, competition, regulatory risk, supply chain, "
-            "customer concentration, litigation",
-            k=4,
-        )
-    except Exception:  # RAG deps not installed or no index — fall back gracefully
+        from .rag.retriever import retrieve_with_telemetry
+        telemetry = retrieve_with_telemetry(ticker, k=4)
+        passages = telemetry["passages"]
+    except Exception as e:  # deps missing or no index — degrade, don't crash
+        telemetry = {"grounded": False, "passages": [], "error": str(e)[:120]}
         passages = []
 
     if passages:
@@ -119,7 +117,7 @@ def risk_agent(state: ResearchState) -> ResearchState:
             )),
             HumanMessage(content=f"{ticker} fundamentals:\n{json.dumps(fund, indent=2)}"),
         ]
-    return {"risks": _text(llm_for("risk").invoke(msg))}
+    return {"risks": _text(llm_for("risk").invoke(msg)), "retrieval": telemetry}
 
 
 # ---------- writer ----------

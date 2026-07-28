@@ -13,6 +13,7 @@ langchain-huggingface>=0.1.0
 langchain-text-splitters>=0.3.0
 sentence-transformers>=3.0
 faiss-cpu>=1.8
+langchain-chroma>=0.2.0        # swap in with VECTOR_STORE=chroma
 requests>=2.31
 beautifulsoup4>=4.12
 

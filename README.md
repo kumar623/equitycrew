@@ -249,17 +249,37 @@ whole app tree into an extra layer (that one alone was 84MB).
 
 ## RAG: ground the Risk agent in the real 10-K
 
+The classic pipeline — **chunk → embed → top-k → LLM** — with every stage visible
+in the UI while it runs.
+
 ```bash
-# fetch latest 10-K from SEC EDGAR, chunk, embed locally, save FAISS index:
+# fetch latest 10-K from SEC EDGAR, chunk, embed locally, index it:
 python -m src.rag.ingest --ticker NVDA
+
+# same corpus in Chroma instead of FAISS — one env var, no code change:
+VECTOR_STORE=chroma python -m src.rag.ingest --ticker NVDA
+
 # or use a filing you downloaded yourself:
 python -m src.rag.ingest --ticker NVDA --file path/to/10k.htm
 ```
 
-Once an index exists in `data/indexes/<TICKER>/`, the Risk agent automatically
-retrieves and cites real risk-factor passages (falls back gracefully otherwise).
-NVDA's index is built from a 364K-character filing; the agent cites passages as
-`[chunk 112]`, e.g. NVIDIA's dependence on third-party foundries and its export-
-control exposure — language taken from the 10-K, not from the model.
+| Stage | What happens |
+|---|---|
+| **Chunk** | `RecursiveCharacterTextSplitter`, 1200 chars with 200 overlap, so a risk factor split across a boundary still lands whole in one chunk |
+| **Embed** | `all-MiniLM-L6-v2` locally — no embedding API cost, model cached process-wide |
+| **Store** | FAISS (default) or Chroma, selected by `VECTOR_STORE`. Same interface, different tradeoffs: FAISS is an in-process index over a fixed corpus; Chroma is a persistent collection with metadata filters and live upserts |
+| **Top-k** | k=4 nearest chunks. Lower starves the model of context, higher pays tokens for noise |
+| **LLM** | Answers from those chunks only, citing them as `[chunk 112]` |
+
+Once an index exists the Risk agent uses it automatically and falls back to live
+fundamentals when no filing is indexed — it never fails the run. NVDA's index is
+built from a 364K-character filing; the agent cites passages like NVIDIA's
+dependence on third-party foundries and its export-control exposure — language
+taken from the 10-K, not from the model.
+
+**Watch it happen.** Click the Risk agent while a run is in flight and the
+inspector shows which store answered, the retrieval latency, and the actual
+passages handed to the model with their similarity scores — the retrieval step
+is shown, not asserted.
 
 > Educational project. Not investment advice.

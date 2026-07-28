@@ -8,6 +8,7 @@ class ResearchState(TypedDict, total=False):
     financials: dict            # Financials agent output
     news: dict                  # News/Sentiment agent output
     risks: str                  # Risk agent output
+    retrieval: dict             # RAG telemetry: store, k, chunks, similarity
     draft: str                  # Writer agent output (the memo)
     critique: str               # Critic agent feedback
     approved: bool              # Critic decision

@@ -45,8 +45,25 @@ def _detail(node: str, state: dict) -> dict:
                 "headlines": [h.get("title") for h in headlines][:6]}
     if node == "risk":
         risks = state.get("risks") or ""
-        # the risk agent cites "[chunk 12]" only when grounded in a real filing
-        return {"summary": risks, "rag_grounded": "[chunk" in risks}
+        t = state.get("retrieval") or {}
+        # Trim passage text: the UI shows a preview, and full chunks would bloat
+        # every SSE frame (and the replay cache) for no visible gain.
+        passages = [
+            {"chunk": p.get("chunk"), "similarity": p.get("similarity"),
+             "preview": (p.get("text") or "")[:260].replace("\n", " ").strip()}
+            for p in (t.get("passages") or [])
+        ]
+        return {
+            "summary": risks,
+            # the risk agent cites "[chunk 12]" only when grounded in a filing
+            "rag_grounded": t.get("grounded", "[chunk" in risks),
+            "retrieval": {
+                "store": t.get("store"), "k": t.get("k"),
+                "embed_model": t.get("embed_model"),
+                "latency_ms": t.get("latency_ms"), "hits": t.get("hits"),
+                "query": t.get("query"), "passages": passages,
+            },
+        }
     if node == "writer":
         draft = state.get("draft") or ""
         return {"words": len(draft.split())}

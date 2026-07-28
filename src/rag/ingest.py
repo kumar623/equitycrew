@@ -6,7 +6,9 @@ Two ways to get the filing:
   2. Use a local file (txt/html) you downloaded yourself:
        python -m src.rag.ingest --ticker NVDA --file path/to/10k.htm
 
-Output: FAISS index at  data/indexes/<TICKER>/
+Vector store is swappable — FAISS (default) or Chroma:
+       VECTOR_STORE=chroma python -m src.rag.ingest --ticker NVDA
+
 Embeddings are local (sentence-transformers) — free, no API key.
 """
 from __future__ import annotations
@@ -17,18 +19,18 @@ from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
-from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from . import store
+from .store import EMBED_MODEL, INDEX_DIR, get_embeddings  # re-exported
 
 # SEC requires a descriptive User-Agent with contact info.
 SEC_HEADERS = {"User-Agent": "EquityCrew research project krishnakumar623@gmail.com"}
-INDEX_DIR = Path("data/indexes")
-EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
-
-def get_embeddings() -> HuggingFaceEmbeddings:
-    return HuggingFaceEmbeddings(model_name=EMBED_MODEL)
+# Chunking: big enough that a risk factor survives intact, with overlap so a
+# point split across a boundary still lands whole in one of the two chunks.
+CHUNK_SIZE = 1200
+CHUNK_OVERLAP = 200
 
 
 # ---------- EDGAR fetch ----------
@@ -70,21 +72,26 @@ def _html_to_text(html: str) -> str:
 
 # ---------- build index ----------
 
-def build_index(ticker: str, text: str) -> Path:
+def build_index(ticker: str, text: str) -> str:
+    """Chunk -> embed -> persist. Returns where it landed."""
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1200, chunk_overlap=200,
+        chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP,
         separators=["\n\n", "\n", ". ", " "],
     )
     chunks = splitter.split_text(text)
-    docs_meta = [{"ticker": ticker.upper(), "chunk": i} for i in range(len(chunks))]
-    store = FAISS.from_texts(chunks, get_embeddings(), metadatas=docs_meta)
+    metas = [{"ticker": ticker.upper(), "chunk": i} for i in range(len(chunks))]
 
+    location = store.build(ticker, chunks, metas)
+
+    # Sidecar manifest so the app can report corpus size without loading it.
     out = INDEX_DIR / ticker.upper()
     out.mkdir(parents=True, exist_ok=True)
-    store.save_local(str(out))
-    (out / "meta.json").write_text(json.dumps({"ticker": ticker.upper(),
-                                               "chunks": len(chunks)}))
-    return out
+    (out / "meta.json").write_text(json.dumps({
+        "ticker": ticker.upper(), "chunks": len(chunks),
+        "store": store.backend(), "embed_model": EMBED_MODEL,
+        "chunk_size": CHUNK_SIZE, "chunk_overlap": CHUNK_OVERLAP,
+    }, indent=2))
+    return location
 
 
 def main() -> None:
@@ -100,7 +107,9 @@ def main() -> None:
         print(f"Fetching latest 10-K for {args.ticker} from SEC EDGAR…")
         text = fetch_latest_10k(args.ticker)
 
-    print(f"Filing length: {len(text):,} chars. Chunking + embedding (local model)…")
+    print(f"Filing length: {len(text):,} chars")
+    print(f"Chunking (size={CHUNK_SIZE}, overlap={CHUNK_OVERLAP}) + embedding "
+          f"locally into {store.backend()}…")
     out = build_index(args.ticker, text)
     print(f"Index saved to {out}")
 
