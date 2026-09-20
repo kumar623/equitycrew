@@ -183,6 +183,13 @@
             background: var(--panel); border: 1px solid var(--border);
             border-left: 3px solid var(--ok); border-radius: 8px;
             padding: 12px 16px; margin: 16px 0 14px; }
+  /* A memo that never passed review must not look like one that did. */
+  .review-flag { display: none; font-size: 13.5px; color: var(--text);
+                 background: linear-gradient(135deg, rgba(210,153,34,.16), rgba(210,153,34,.05));
+                 border: 1px solid rgba(210,153,34,.45);
+                 border-left: 3px solid var(--warn); border-radius: 8px;
+                 padding: 12px 16px; margin: 16px 0 14px; }
+  .why { color: var(--muted); font-size: 12.5px; margin-top: 5px; line-height: 1.5; }
   .memo-head { display: none; align-items: center; justify-content: space-between;
                margin-bottom: 10px; }
   .memo-head button { padding: 7px 14px; font-size: 12.5px; font-weight: 600;
@@ -384,6 +391,8 @@
     </div>
     <div class="draft-body" id="draftBody"></div>
   </div>
+
+  <div class="review-flag" id="reviewFlag"></div>
 
   <div class="memo-head" id="memoHead">
     <div style="font-size:13px;color:var(--muted)">Final memo</div>
@@ -664,7 +673,8 @@ function run() {
   document.getElementById("earlyTiles").innerHTML = "";
   document.getElementById("draftBody").textContent = "";
   document.getElementById("draft").style.display = "none";
-  for (const id of ["memo", "verify", "error"]) document.getElementById(id).style.display = "none";
+  for (const id of ["memo", "verify", "error", "reviewFlag"])
+    document.getElementById(id).style.display = "none";
   document.getElementById("memoHead").style.display = "none";
   document.getElementById("inspect").innerHTML =
     `<div class="hint">Click any agent in the ring to see exactly what it produced.</div>`;
@@ -734,9 +744,10 @@ function run() {
     if (d.node === "verifier" && d.verification) {
       const v = d.verification, elv = document.getElementById("verify");
       elv.style.display = "block";
-      elv.innerHTML = v.all_correct
-        ? "🔍 <b>Verifier:</b> all figures matched fresh data ✓"
-        : `🔍 <b>Verifier fixed ${v.mismatches.length} figure(s):</b> ${v.mismatches.map(esc).join("; ")}`;
+      elv.innerHTML = (v.all_correct
+        ? "🔍 <b>Verifier (LLM):</b> all figures matched fresh data ✓"
+        : `🔍 <b>Verifier (LLM) fixed ${v.mismatches.length} figure(s):</b> ${v.mismatches.map(esc).join("; ")}`)
+        + deterministicLine(v.deterministic);
       elv.style.borderLeftColor = v.all_correct ? "var(--ok)" : "var(--warn)";
       document.getElementById("tag-verifier").textContent =
         v.all_correct ? "" : `${v.mismatches.length} fixed`;
@@ -748,9 +759,10 @@ function run() {
       document.getElementById("draft").style.display = "none";
       NODES.forEach(n => markDone(n.id));
       setProgress("Memo ready ✓");
+      showReviewFlag(d.review);
       if (d.memo) {
-        memoText = d.memo;
-        renderMemo(d.memo);
+        memoText = d.memo;   // copied markdown keeps the notice; the panel
+        renderMemo(d.memo);  // shows it as a banner instead of a quote line
         document.getElementById("memoHead").style.display = "flex";
       }
       return;
@@ -852,9 +864,44 @@ function splitBullBear(body) {
   return { bull: strip(text.slice(bullIdx, bearIdx)), bear: strip(text.slice(bearIdx)) };
 }
 
+// The unapproved notice is prepended to the memo text by the finalize node so
+// it survives copy/paste, the CLI and MCP. Here we lift it out into a banner
+// and strip it, so it isn't shown twice.
+const UNAPPROVED_LINE = /^>\s*⚠️[^\n]*\n+/;
+
+// Second verdict, computed in code with no model involved. Shown next to the
+// LLM's so they can be compared — the disagreement is the honest signal.
+function deterministicLine(det) {
+  if (!det) return "";
+  const pct = Math.round(det.accuracy * 100);
+  const n = det.untraceable.length;
+  const head = `<div class="why">🧮 <b>Deterministic re-check:</b> ${pct}% of figures `
+    + `matched tool data exactly` + (n ? `; ${n} not traceable: ` : ".")
+    + (n ? det.untraceable.slice(0, 6).map(esc).join(", ") : "");
+  const note = det.agrees_with_llm
+    ? `<div class="why">Both checks agree.</div>`
+    : `<div class="why">⚠️ The two checks <b>disagree</b> — worth a look. `
+      + `Untraceable can also mean the writer derived the figure rather than `
+      + `quoting it, so this flags, it doesn't convict.</div>`;
+  return head + "</div>" + note;
+}
+
+function showReviewFlag(review) {
+  const el = document.getElementById("reviewFlag");
+  if (!review || review.approved) { el.style.display = "none"; return; }
+  el.style.display = "block";
+  el.innerHTML =
+    `⚠️ <b>Not approved by review.</b> The critic rejected this memo and the ` +
+    `revision budget (${esc(review.max_revisions)}) ran out after ` +
+    `${esc(review.revisions_used)} attempt(s), so it ships unapproved.` +
+    (review.last_critique
+      ? `<div class="why"><b>Unresolved:</b> ${esc(review.last_critique)}</div>` : "");
+}
+
 function renderMemo(md) {
   const host = document.getElementById("memo");
   host.style.display = "block";
+  md = md.replace(UNAPPROVED_LINE, "");
   const secs = splitSections(md);
   if (secs.length < 3) { host.innerHTML = marked.parse(md); return; }  // fallback
 

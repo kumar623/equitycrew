@@ -12,6 +12,7 @@ import re
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
 
+from .checks import numeric_accuracy
 from .config import AGENT_MODELS, get_llm, DISABLE_RAG, MAX_REVISIONS, MODEL_NAME
 from .state import ResearchState
 from .tools.market_data import get_price, get_fundamentals, get_news
@@ -307,15 +308,57 @@ def verifier_agent(state: ResearchState) -> ResearchState:
         elif c.find:
             unapplied.append(f"{c.note} (could not locate “{c.find}” in the memo)")
 
+    # Second opinion, in code. The LLM above decided which figures disagree with
+    # the fresh data; this re-checks the memo that actually ships against the
+    # same data with no model involved. Where the two disagree is the
+    # interesting signal — an LLM grading its own arithmetic is not evidence.
+    accuracy, ungrounded = numeric_accuracy(
+        draft, fresh["price"], fresh["fundamentals"]
+    )
+    llm_clean = result.all_numbers_correct and not applied
     return {
         "draft": draft,
         "verification": {
-            "all_correct": result.all_numbers_correct and not applied,
+            "all_correct": llm_clean,
             "mismatches": applied,
             "unapplied": unapplied,
+            "deterministic": {
+                "accuracy": round(accuracy, 3),
+                # "not traceable to tool data" — a figure the writer derived
+                # legitimately lands here too, so this is a flag, not a verdict.
+                "untraceable": ungrounded,
+                "agrees_with_llm": llm_clean == (not ungrounded),
+            },
         },
     }
 
 
+#: Prepended to a memo the critic never approved. It goes in the memo text, not
+#: just the API payload, so it survives the copy button, the CLI and MCP — the
+#: places where an unapproved memo would otherwise look exactly like a good one.
+UNAPPROVED_NOTICE = (
+    "> ⚠️ **Not approved by review.** The critic rejected this memo and the "
+    "revision budget ran out, so it ships unapproved. Treat it as a draft."
+)
+
+
 def finalize(state: ResearchState) -> ResearchState:
-    return {"final_memo": state["draft"]}
+    """Assemble the result, and say so when review never passed.
+
+    Both exits from the critic loop — approved, and out of revisions — route
+    here. Without this they produced an identical memo, so a draft the critic
+    rejected twice shipped looking exactly like one it endorsed.
+    """
+    approved = bool(state.get("approved"))
+    memo = state["draft"]
+    if not approved:
+        memo = f"{UNAPPROVED_NOTICE}\n\n{memo}"
+    return {
+        "final_memo": memo,
+        "review": {
+            "approved": approved,
+            "revisions_used": state.get("revision_count", 0),
+            "max_revisions": MAX_REVISIONS,
+            "last_critique": None if approved else state.get("critique"),
+        },
+    }

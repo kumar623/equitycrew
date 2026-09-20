@@ -14,4 +14,5 @@ class ResearchState(TypedDict, total=False):
     approved: bool              # Critic decision
     revision_count: int         # guards the critic->writer loop
     verification: dict          # Verifier agent report (mismatches fixed)
+    review: dict                # did the memo pass review, or run out of revisions
     final_memo: Optional[str]   # assembled result

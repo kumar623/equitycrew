@@ -73,7 +73,7 @@ def _detail(node: str, state: dict) -> dict:
     if node == "verifier":
         return state.get("verification") or {}
     if node == "finalize":
-        return {"memo": state.get("final_memo")}
+        return {"memo": state.get("final_memo"), "review": state.get("review")}
     return {}
 
 
@@ -116,13 +116,12 @@ def research_stream(ticker: str, request: Request):
 
     def gen():
         try:
-            # Preflight: a symbol with no market data would otherwise burn a
-            # full crew run (~60s, ~$0.10) to conclude it has nothing to say.
-            check = resolve_ticker(ticker)
-            if not check["ok"]:
-                yield f"data: {json.dumps({'node': 'invalid_ticker', **check})}\n\n"
-                return
-            sym = check["ticker"]
+            # Order matters: every check below is free and in-process, and
+            # resolve_ticker is a network call to Yahoo. Validating first meant
+            # a flood of requests hit Yahoo once each *before* anything could
+            # reject them — the cheapest defence running last, behind the most
+            # rate-limitable dependency. Cache and limits now gate it.
+            sym = ticker.strip().upper()
 
             # 1. Free path: replay a recent run of this ticker.
             hit = limits.cached(sym)
@@ -138,6 +137,15 @@ def research_stream(ticker: str, request: Request):
                 if payloads:
                     yield from replay(payloads, f"Showing a cached {fallback_ticker} run.")
                 return
+
+            # 3. Now spend a network call: a symbol with no market data would
+            # otherwise burn a full crew run (~40s, ~$0.07) to conclude it has
+            # nothing to say. Checked before record() so a typo costs no quota.
+            check = resolve_ticker(sym)
+            if not check["ok"]:
+                yield f"data: {json.dumps({'node': 'invalid_ticker', **check})}\n\n"
+                return
+            sym = check["ticker"]
             limits.record(ip)
 
             graph = build_graph()
@@ -148,7 +156,7 @@ def research_stream(ticker: str, request: Request):
             last = t0
             prev = tracker.snapshot()
             for mode, event in graph.stream(
-                {"ticker": ticker.upper(), "revision_count": 0},
+                {"ticker": sym, "revision_count": 0},
                 # A list of modes makes LangGraph yield (mode, payload) tuples.
                 # "messages" carries LLM tokens as they are generated, which is
                 # what lets the memo appear ~30s before the run finishes.
@@ -203,6 +211,9 @@ def research_stream(ticker: str, request: Request):
                         payload["verification"] = state.get("verification")
                     if node == "finalize":
                         payload["memo"] = state.get("final_memo")
+                        # Whether review passed travels with the memo, so the
+                        # UI can flag a draft the critic never approved.
+                        payload["review"] = state.get("review")
                     emitted.append(payload)
                     yield f"data: {json.dumps(payload)}\n\n"
             # Cache only a run that actually produced a memo.
