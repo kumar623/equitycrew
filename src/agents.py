@@ -315,11 +315,19 @@ def verifier_agent(state: ResearchState) -> ResearchState:
     accuracy, ungrounded = numeric_accuracy(
         draft, fresh["price"], fresh["fundamentals"]
     )
-    llm_clean = result.all_numbers_correct and not applied
+    # Both verdicts must describe the SAME memo — the corrected one — or they
+    # disagree by construction every time the verifier does its job. Comparing
+    # the LLM's pre-fix finding against the post-fix re-check flagged a
+    # disagreement on a run where the two agreed completely: the LLM fixed
+    # three figures and the re-check confirmed the result was 100% clean.
+    llm_clean_after_fixes = not unapplied     # everything it flagged got applied
+    deterministic_clean = not ungrounded
     return {
         "draft": draft,
         "verification": {
-            "all_correct": llm_clean,
+            # "were fixes needed" — what the UI reports, and not the same
+            # question as "is the shipped memo correct".
+            "all_correct": result.all_numbers_correct and not applied,
             "mismatches": applied,
             "unapplied": unapplied,
             "deterministic": {
@@ -327,7 +335,7 @@ def verifier_agent(state: ResearchState) -> ResearchState:
                 # "not traceable to tool data" — a figure the writer derived
                 # legitimately lands here too, so this is a flag, not a verdict.
                 "untraceable": ungrounded,
-                "agrees_with_llm": llm_clean == (not ungrounded),
+                "agrees_with_llm": llm_clean_after_fixes == deterministic_clean,
             },
         },
     }
