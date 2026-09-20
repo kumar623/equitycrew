@@ -28,17 +28,28 @@ TOKEN = re.compile(
 )
 
 
+#: Tool fields stored as a fraction but written as a percentage in a memo
+#: (revenue_growth 1.059 -> "105.9%"). Matched on the field NAME, because
+#: magnitude is not a reliable signal: the rule here used to be "convert
+#: anything below 1", which silently excluded every growth rate above 100%.
+#: NVDA grew 105.9%, the memo said so correctly, and the checker called it
+#: ungrounded three times. Fields already in percent (change_pct) must not be
+#: converted, so they are matched by neither rule.
+FRACTION_FIELDS = re.compile(r"margin|growth|yield|payout", re.I)
+
+
 def truth_values(*data_dicts: dict) -> set:
     """Every numeric value from tool data, plus the variants a memo might use
-    (0.6297 -> 62.97%, 5_090_000_000_000 -> 5.09T / 5090B)."""
+    (0.6297 -> 62.97%, 1.059 -> 105.9%, 5_090_000_000_000 -> 5.09T / 5090B)."""
     vals = set()
     for d in data_dicts:
-        for v in (d or {}).values():
+        for key, v in (d or {}).items():
             if isinstance(v, bool) or not isinstance(v, (int, float)):
                 continue
             vals.add(float(v))
-            if 0 < abs(v) < 1:
-                vals.add(round(v * 100, 4))          # ratio -> percent
+            # ratio -> percent, by field name or (for unlabelled dicts) by size
+            if FRACTION_FIELDS.search(key) or 0 < abs(v) < 1:
+                vals.add(round(v * 100, 4))
             if abs(v) > 1e9:
                 vals.update((v / 1e12, v / 1e9, v / 1e6))  # T / B / M scales
     return vals
